@@ -194,6 +194,13 @@ export default function AIAssistantClient() {
     return '';
   });
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [showGoogleConfig, setShowGoogleConfig] = useState(false);
+  const [tempGoogleId, setTempGoogleId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lexastra_google_client_id') || '';
+    }
+    return '';
+  });
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [googleUser, setGoogleUser] = useState(null);
@@ -354,6 +361,14 @@ export default function AIAssistantClient() {
     localStorage.removeItem('lexastra_google_user');
     setGoogleUser(null);
     window.dispatchEvent(new Event('google-signout'));
+  };
+
+  const handleSaveGoogleId = () => {
+    if (tempGoogleId.trim()) {
+      localStorage.setItem('lexastra_google_client_id', tempGoogleId.trim());
+      setShowGoogleConfig(false);
+      window.location.reload();
+    }
   };
 
   const handleCopy = (content, index) => {
@@ -659,12 +674,18 @@ export default function AIAssistantClient() {
           </div>
         )}
 
-        <div className="chat-sidebar__footer">
+        <div className="chat-sidebar__footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button 
             onClick={() => setShowApiKeyInput(true)} 
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
           >
             Configure DeepSeek Key
+          </button>
+          <button 
+            onClick={() => setShowGoogleConfig(true)} 
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
+          >
+            Configure Google Sign-in ID
           </button>
         </div>
       </aside>
@@ -704,7 +725,36 @@ export default function AIAssistantClient() {
         </div>
 
         <div className="chat-messages" ref={chatContainerRef} onScroll={handleScroll}>
-          {showApiKeyInput ? (
+          {showGoogleConfig ? (
+            <div className="api-key-section" style={{ margin: 'auto', maxWidth: '500px', background: 'var(--bg-card)', padding: '32px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)', textAlign: 'left' }}>
+              <h3 style={{ marginBottom: '16px', color: 'var(--navy)' }}>Google Sign-in ID</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                To enable Google Sign-in, enter your Google OAuth Client ID. 
+              </p>
+              <div style={{ background: 'rgba(201,168,76,0.08)', padding: '12px', borderRadius: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.4' }}>
+                <strong>How to get it:</strong>
+                <ol style={{ marginLeft: '16px', marginTop: '6px' }}>
+                  <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--gold-dark)' }}>Google Cloud Console</a>.</li>
+                  <li>Create a project, navigate to <strong>APIs & Services &gt; Credentials</strong>.</li>
+                  <li>Create an <strong>OAuth Client ID</strong> (Web Application).</li>
+                  <li>Add <code>http://localhost:3000</code> and your production Vercel URL to <strong>Authorized JavaScript Origins</strong>.</li>
+                  <li>Copy the Client ID and paste it below.</li>
+                </ol>
+              </div>
+              <input
+                type="text"
+                className="search-bar__input"
+                style={{ paddingLeft: '24px', marginBottom: '24px' }}
+                placeholder="123456-abcde.apps.googleusercontent.com"
+                value={tempGoogleId}
+                onChange={(e) => setTempGoogleId(e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button className="btn btn--ghost" onClick={() => setShowGoogleConfig(false)}>Cancel</button>
+                <button className="btn btn--primary" onClick={handleSaveGoogleId}>Save & Reload</button>
+              </div>
+            </div>
+          ) : showApiKeyInput ? (
             <div className="api-key-section" style={{ margin: 'auto', maxWidth: '500px', background: 'var(--bg-card)', padding: '32px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
               <h3 style={{ marginBottom: '16px', color: 'var(--navy)' }}>API Configuration</h3>
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
