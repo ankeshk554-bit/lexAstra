@@ -1,0 +1,754 @@
+{
+  "id": "transfer-of-property-act",
+  "slug": "transfer-of-property-act",
+  "name": "The Transfer of Property Act",
+  "year": 1882,
+  "sectionCount": 137,
+  "category": "Civil",
+  "description": "An Act to amend the law relating to the transfer of property by act of parties, regulating the general rules of property transfer (e.g. sale, mortgage, lease, gift, exchange).",
+  "lastUpdated": "2024-01-01",
+  "isNew": false,
+  "replacedBy": null,
+  "replaces": null,
+  "transitionNote": null,
+  "chapters": [
+    {
+      "number": "I",
+      "title": "PRELIMINARY",
+      "sections": [
+        {
+          "number": "1",
+          "title": "Short title, commencement, extent",
+          "text": "Statutory text of Section 1 (Short title, commencement, extent) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "2",
+          "title": "Repeal of Acts, Saving of certain enactments, incidents, rights, liabilities, etc.",
+          "text": "Statutory text of Section 2 (Repeal of Acts, Saving of certain enactments, incidents, rights, liabilities, etc.) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "3",
+          "title": "Interpretation-clause",
+          "text": "Statutory text of Section 3 (Interpretation-clause) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "4",
+          "title": "Enactments relating to contracts to be taken as part of Contract Act and supplemental to the Registration Act",
+          "text": "Statutory text of Section 4 (Enactments relating to contracts to be taken as part of Contract Act and supplemental to the Registration Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    },
+    {
+      "number": "II",
+      "title": "OF TRANSFERS OF PROPERTY BY ACT OF PARTIES",
+      "sections": [
+        {
+          "number": "5",
+          "title": "Transfer of property defined",
+          "text": "In the following sections \"transfer of property\" means an act by which a living person conveys property, in present or in future, to one or more other living persons, or to himself, or to himself and one or more other living persons; and \"to transfer property\" is to perform such act.\n\nIn this section \"living person\" includes a company or association or body of individuals, whether incorporated or not, but nothing herein contained shall affect any law for the time being in force relating to transfer of property to or by companies, associations or bodies of individuals."
+        },
+        {
+          "number": "6",
+          "title": "What may be transferred",
+          "text": "Property of any kind may be transferred, except as otherwise provided by this Act or by any other law for the time being in force.\n\n(a) The chance of an heir-apparent succeeding to an estate, the chance of a relation obtaining a legacy on the death of a kinsman, or any other mere possibility of a like nature, cannot be transferred.\n\n(b) A mere right of re-entry for breach of a condition subsequent cannot be transferred to any one except the owner of the property affected thereby.\n\n(c) An easement cannot be transferred apart from the dominant heritage.\n\n(d) An interest in property restricted in its enjoyment to the owner personally cannot be transferred by him.\n\n(dd) A right to future maintenance, in whatsoever manner arising, secured or determined, cannot be transferred.\n\n(e) A mere right to sue cannot be transferred.\n\n(f) A public office cannot be transferred, nor can the salary of a public officer, whether before or after it has become payable.\n\n(g) Stipends allowed to military, naval, air-force and civil pensioners of the Government and political pensions cannot be transferred.\n\n(h) No transfer can be made (1) in so far as it is opposed to the nature of the interest affected thereby, or (2) for an unlawful object or consideration within the meaning of section 23 of the Indian Contract Act, 1872, or (3) to a person legally disqualified to be transferee.\n\n(i) Nothing in this section shall be deemed to authorise a tenant having an untransferable right of occupancy, the farmer of an estate in respect of which default has been made in paying revenue, or the lessee of an estate under the management of a Court of Wards, to assign his interest as such tenant, farmer or lessee."
+        },
+        {
+          "number": "7",
+          "title": "Persons competent to transfer",
+          "text": "Statutory text of Section 7 (Persons competent to transfer) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "8",
+          "title": "Operation of transfer",
+          "text": "Statutory text of Section 8 (Operation of transfer) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "9",
+          "title": "Oral transfer",
+          "text": "Statutory text of Section 9 (Oral transfer) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "10",
+          "title": "Condition restraining alienation",
+          "text": "Statutory text of Section 10 (Condition restraining alienation) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "11",
+          "title": "Restriction repugnant to interest created",
+          "text": "Statutory text of Section 11 (Restriction repugnant to interest created) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "12",
+          "title": "Condition making interest determinable on insolvency or attempted alienation",
+          "text": "Statutory text of Section 12 (Condition making interest determinable on insolvency or attempted alienation) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "13",
+          "title": "Transfer for benefit of unborn person",
+          "text": "Statutory text of Section 13 (Transfer for benefit of unborn person) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "14",
+          "title": "Rule against perpetuity",
+          "text": "No transfer of property can operate to create an interest which is to take effect after the life-time of one or more persons living at the date of such transfer, and the minority of some person who shall be in existence at the expiration of that period, and to whom, if he attains full age, the interest created is to belong."
+        },
+        {
+          "number": "15",
+          "title": "Section 15 of the Transfer of Property Act",
+          "text": "Statutory text of Section 15 (Section 15 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "16",
+          "title": "Section 16 of the Transfer of Property Act",
+          "text": "Statutory text of Section 16 (Section 16 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "17",
+          "title": "Section 17 of the Transfer of Property Act",
+          "text": "Statutory text of Section 17 (Section 17 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "18",
+          "title": "Section 18 of the Transfer of Property Act",
+          "text": "Statutory text of Section 18 (Section 18 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "19",
+          "title": "Vested interest",
+          "text": "Statutory text of Section 19 (Vested interest) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "20",
+          "title": "Section 20 of the Transfer of Property Act",
+          "text": "Statutory text of Section 20 (Section 20 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "21",
+          "title": "Contingent interest",
+          "text": "Statutory text of Section 21 (Contingent interest) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "22",
+          "title": "Section 22 of the Transfer of Property Act",
+          "text": "Statutory text of Section 22 (Section 22 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "23",
+          "title": "Section 23 of the Transfer of Property Act",
+          "text": "Statutory text of Section 23 (Section 23 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "24",
+          "title": "Section 24 of the Transfer of Property Act",
+          "text": "Statutory text of Section 24 (Section 24 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "25",
+          "title": "Conditional transfer",
+          "text": "Statutory text of Section 25 (Conditional transfer) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "26",
+          "title": "Section 26 of the Transfer of Property Act",
+          "text": "Statutory text of Section 26 (Section 26 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "27",
+          "title": "Section 27 of the Transfer of Property Act",
+          "text": "Statutory text of Section 27 (Section 27 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "28",
+          "title": "Section 28 of the Transfer of Property Act",
+          "text": "Statutory text of Section 28 (Section 28 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "29",
+          "title": "Section 29 of the Transfer of Property Act",
+          "text": "Statutory text of Section 29 (Section 29 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "30",
+          "title": "Section 30 of the Transfer of Property Act",
+          "text": "Statutory text of Section 30 (Section 30 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "31",
+          "title": "Section 31 of the Transfer of Property Act",
+          "text": "Statutory text of Section 31 (Section 31 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "32",
+          "title": "Section 32 of the Transfer of Property Act",
+          "text": "Statutory text of Section 32 (Section 32 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "33",
+          "title": "Section 33 of the Transfer of Property Act",
+          "text": "Statutory text of Section 33 (Section 33 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "34",
+          "title": "Section 34 of the Transfer of Property Act",
+          "text": "Statutory text of Section 34 (Section 34 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "35",
+          "title": "Election when necessary",
+          "text": "Statutory text of Section 35 (Election when necessary) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "36",
+          "title": "Section 36 of the Transfer of Property Act",
+          "text": "Statutory text of Section 36 (Section 36 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "37",
+          "title": "Section 37 of the Transfer of Property Act",
+          "text": "Statutory text of Section 37 (Section 37 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "38",
+          "title": "Section 38 of the Transfer of Property Act",
+          "text": "Statutory text of Section 38 (Section 38 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "39",
+          "title": "Section 39 of the Transfer of Property Act",
+          "text": "Statutory text of Section 39 (Section 39 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "40",
+          "title": "Section 40 of the Transfer of Property Act",
+          "text": "Statutory text of Section 40 (Section 40 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "41",
+          "title": "Transfer by ostensible owner",
+          "text": "Statutory text of Section 41 (Transfer by ostensible owner) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "42",
+          "title": "Section 42 of the Transfer of Property Act",
+          "text": "Statutory text of Section 42 (Section 42 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "43",
+          "title": "Transfer by unauthorized person who subsequently acquires interest in property transferred (Feeding the grant by estoppel)",
+          "text": "Statutory text of Section 43 (Transfer by unauthorized person who subsequently acquires interest in property transferred (Feeding the grant by estoppel)) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "44",
+          "title": "Section 44 of the Transfer of Property Act",
+          "text": "Statutory text of Section 44 (Section 44 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "45",
+          "title": "Section 45 of the Transfer of Property Act",
+          "text": "Statutory text of Section 45 (Section 45 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "46",
+          "title": "Section 46 of the Transfer of Property Act",
+          "text": "Statutory text of Section 46 (Section 46 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "47",
+          "title": "Section 47 of the Transfer of Property Act",
+          "text": "Statutory text of Section 47 (Section 47 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "48",
+          "title": "Section 48 of the Transfer of Property Act",
+          "text": "Statutory text of Section 48 (Section 48 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "49",
+          "title": "Section 49 of the Transfer of Property Act",
+          "text": "Statutory text of Section 49 (Section 49 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "50",
+          "title": "Section 50 of the Transfer of Property Act",
+          "text": "Statutory text of Section 50 (Section 50 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "51",
+          "title": "Section 51 of the Transfer of Property Act",
+          "text": "Statutory text of Section 51 (Section 51 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "52",
+          "title": "Transfer of property pending suit relating thereto (Lis Pendens)",
+          "text": "During the dependency in any Court having authority within India of any suit or proceeding which is not collusive and in which any right to immoveable property is directly and specifically in question, the property cannot be transferred or otherwise dealt with by any party to the suit or proceeding so as to affect the rights of any other party thereto under any decree or order which may be made therein, except under the authority of the Court and on such terms as it may impose.\n\nExplanation.—For the purposes of this section, the dependency of a suit or proceeding shall be deemed to commence from the date of the presentation of the plaint or the institution of the proceeding in a Court of competent jurisdiction, and to continue until the suit or proceeding has been disposed of by a final decree or order and complete satisfaction or discharge of such decree or order has been obtained, or has become unobtainable by reason of the expiration of any period of limitation prescribed for the execution thereof by any law for the time being in force."
+        },
+        {
+          "number": "53",
+          "title": "Fraudulent transfer",
+          "text": "Statutory text of Section 53 (Fraudulent transfer) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "53A",
+          "title": "Part performance",
+          "text": "Where any person contracts to transfer for consideration any immoveable property by writing signed by him or on his behalf from which the terms necessary to constitute the transfer can be ascertained with reasonable certainty,\nand the transferee has, in part performance of the contract, taken possession of the property or any part thereof, or the transferee, being already in possession, continues in possession in part performance of the contract and has done some act in furtherance of the contract,\nand the transferee has performed or is willing to perform his part of the contract,\nthen, notwithstanding that where there is an instrument of transfer, that the transfer has not been completed in the manner prescribed therefor by the law for the time being in force, the transferor or any person claiming under him shall be debarred from enforcing against the transferee and persons claiming under him any right in respect of the property of which the transferee has taken or continued in possession, other than a right expressly provided by the terms of the contract:\nProvided that nothing in this section shall affect the rights of a transferee for consideration who has no notice of the contract or of the part performance thereof."
+        }
+      ]
+    },
+    {
+      "number": "III",
+      "title": "OF SALES OF IMMOVABLE PROPERTY",
+      "sections": [
+        {
+          "number": "54",
+          "title": "Sale defined, Sale how made",
+          "text": "Statutory text of Section 54 (Sale defined, Sale how made) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "55",
+          "title": "Section 55 of the Transfer of Property Act",
+          "text": "Statutory text of Section 55 (Section 55 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "56",
+          "title": "Section 56 of the Transfer of Property Act",
+          "text": "Statutory text of Section 56 (Section 56 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "57",
+          "title": "Section 57 of the Transfer of Property Act",
+          "text": "Statutory text of Section 57 (Section 57 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    },
+    {
+      "number": "IV",
+      "title": "OF MORTGAGES OF IMMOVABLE PROPERTY AND CHARGES",
+      "sections": [
+        {
+          "number": "58",
+          "title": "\"Mortgage\", \"mortgagor\", \"mortgagee\", \"mortgage-money\" and \"mortgage-deed\" defined",
+          "text": "(a) A mortgage is the transfer of an interest in specific immoveable property for the purpose of securing the payment of money advanced or to be advanced by way of loan, an existing or future debt, or the performance of an engagement which may give rise to a pecuniary liability.\n\nThe transferor is called a mortgagor, the transferee a mortgagee; the principal money and interest of which payment is secured for the time being are called the mortgage-money, and the instrument (if any) by which the transfer is effected is called a mortgage-deed.\n\n(b) Simple mortgage.—Where, without delivering possession of the mortgaged property, the mortgagor binds himself personally to pay the mortgage-money, and agrees, expressly or impliedly, that, in the event of his failing to pay according to his contract, the mortgagee shall have a right to cause the mortgaged property to be sold and the proceeds of sale to be applied, so far as may be necessary, in payment of the mortgage-money, the transaction is called a simple mortgage and the mortgagee a simple mortgagee.\n\n(c) Mortgage by conditional sale.—Where the mortgagor ostensibly sells the mortgaged property—\non condition that on default of payment of the mortgage-money on a certain date the sale shall become absolute, or\non condition that on such payment being made the sale shall become void, or\non condition that on such payment being made the buyer shall transfer the property to the seller,\nthe transaction is called a mortgage by conditional sale and the mortgagee a mortgagee by conditional sale.\n\n(d) Usufructuary mortgage.—Where the mortgagor delivers possession or expressly or by implication binds himself to deliver possession of the mortgaged property to the mortgagee, and authorises him to retain such possession until payment of the mortgage-money, and to receive the rents and profits accruing from the property or any part of such rents and profits and to appropriate the same in lieu of interest, or in payment of the mortgage-money, or partly in lieu of interest or partly in payment of the mortgage-money, the transaction is called an usufructuary mortgage and the mortgagee an usufructuary mortgagee.\n\n(e) English mortgage.—Where the mortgagor binds himself to re-pay the mortgage-money on a certain date, and transfers the mortgaged property absolutely to the mortgagee, but subject to a proviso that he will re-transfer it to the mortgagor upon payment of the mortgage-money as agreed, the transaction is called an English mortgage.\n\n(f) Mortgage by deposit of title-deeds.—Where a person in any of the following towns, namely, the towns of Calcutta, Madras, and Bombay, and in any other town which the State Government concerned may, by notification in the Official Gazette, specify in this behalf, delivers to a creditor or his agent documents of title to immoveable property, with intent to create a security thereon, the transaction is called a mortgage by deposit of title-deeds.\n\n(g) Anomalous mortgage.—A mortgage which is not a simple mortgage, a mortgage by conditional sale, an usufructuary mortgage, an English mortgage or a mortgage by deposit of title-deeds within the meaning of this section is called an anomalous mortgage."
+        },
+        {
+          "number": "59",
+          "title": "Section 59 of the Transfer of Property Act",
+          "text": "Statutory text of Section 59 (Section 59 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "60",
+          "title": "Section 60 of the Transfer of Property Act",
+          "text": "Statutory text of Section 60 (Section 60 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "61",
+          "title": "Section 61 of the Transfer of Property Act",
+          "text": "Statutory text of Section 61 (Section 61 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "62",
+          "title": "Section 62 of the Transfer of Property Act",
+          "text": "Statutory text of Section 62 (Section 62 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "63",
+          "title": "Section 63 of the Transfer of Property Act",
+          "text": "Statutory text of Section 63 (Section 63 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "64",
+          "title": "Section 64 of the Transfer of Property Act",
+          "text": "Statutory text of Section 64 (Section 64 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "65",
+          "title": "Section 65 of the Transfer of Property Act",
+          "text": "Statutory text of Section 65 (Section 65 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "66",
+          "title": "Section 66 of the Transfer of Property Act",
+          "text": "Statutory text of Section 66 (Section 66 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "67",
+          "title": "Section 67 of the Transfer of Property Act",
+          "text": "Statutory text of Section 67 (Section 67 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "68",
+          "title": "Section 68 of the Transfer of Property Act",
+          "text": "Statutory text of Section 68 (Section 68 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "69",
+          "title": "Section 69 of the Transfer of Property Act",
+          "text": "Statutory text of Section 69 (Section 69 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "70",
+          "title": "Section 70 of the Transfer of Property Act",
+          "text": "Statutory text of Section 70 (Section 70 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "71",
+          "title": "Section 71 of the Transfer of Property Act",
+          "text": "Statutory text of Section 71 (Section 71 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "72",
+          "title": "Section 72 of the Transfer of Property Act",
+          "text": "Statutory text of Section 72 (Section 72 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "73",
+          "title": "Section 73 of the Transfer of Property Act",
+          "text": "Statutory text of Section 73 (Section 73 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "74",
+          "title": "Section 74 of the Transfer of Property Act",
+          "text": "Statutory text of Section 74 (Section 74 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "75",
+          "title": "Section 75 of the Transfer of Property Act",
+          "text": "Statutory text of Section 75 (Section 75 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "76",
+          "title": "Section 76 of the Transfer of Property Act",
+          "text": "Statutory text of Section 76 (Section 76 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "77",
+          "title": "Section 77 of the Transfer of Property Act",
+          "text": "Statutory text of Section 77 (Section 77 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "78",
+          "title": "Section 78 of the Transfer of Property Act",
+          "text": "Statutory text of Section 78 (Section 78 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "79",
+          "title": "Section 79 of the Transfer of Property Act",
+          "text": "Statutory text of Section 79 (Section 79 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "80",
+          "title": "Section 80 of the Transfer of Property Act",
+          "text": "Statutory text of Section 80 (Section 80 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "81",
+          "title": "Section 81 of the Transfer of Property Act",
+          "text": "Statutory text of Section 81 (Section 81 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "82",
+          "title": "Section 82 of the Transfer of Property Act",
+          "text": "Statutory text of Section 82 (Section 82 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "83",
+          "title": "Section 83 of the Transfer of Property Act",
+          "text": "Statutory text of Section 83 (Section 83 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "84",
+          "title": "Section 84 of the Transfer of Property Act",
+          "text": "Statutory text of Section 84 (Section 84 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "85",
+          "title": "Section 85 of the Transfer of Property Act",
+          "text": "Statutory text of Section 85 (Section 85 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "86",
+          "title": "Section 86 of the Transfer of Property Act",
+          "text": "Statutory text of Section 86 (Section 86 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "87",
+          "title": "Section 87 of the Transfer of Property Act",
+          "text": "Statutory text of Section 87 (Section 87 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "88",
+          "title": "Section 88 of the Transfer of Property Act",
+          "text": "Statutory text of Section 88 (Section 88 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "89",
+          "title": "Section 89 of the Transfer of Property Act",
+          "text": "Statutory text of Section 89 (Section 89 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "90",
+          "title": "Section 90 of the Transfer of Property Act",
+          "text": "Statutory text of Section 90 (Section 90 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "91",
+          "title": "Section 91 of the Transfer of Property Act",
+          "text": "Statutory text of Section 91 (Section 91 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "92",
+          "title": "Section 92 of the Transfer of Property Act",
+          "text": "Statutory text of Section 92 (Section 92 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "93",
+          "title": "Section 93 of the Transfer of Property Act",
+          "text": "Statutory text of Section 93 (Section 93 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "94",
+          "title": "Section 94 of the Transfer of Property Act",
+          "text": "Statutory text of Section 94 (Section 94 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "95",
+          "title": "Section 95 of the Transfer of Property Act",
+          "text": "Statutory text of Section 95 (Section 95 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "96",
+          "title": "Section 96 of the Transfer of Property Act",
+          "text": "Statutory text of Section 96 (Section 96 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "97",
+          "title": "Section 97 of the Transfer of Property Act",
+          "text": "Statutory text of Section 97 (Section 97 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "98",
+          "title": "Section 98 of the Transfer of Property Act",
+          "text": "Statutory text of Section 98 (Section 98 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "99",
+          "title": "Section 99 of the Transfer of Property Act",
+          "text": "Statutory text of Section 99 (Section 99 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "100",
+          "title": "Section 100 of the Transfer of Property Act",
+          "text": "Statutory text of Section 100 (Section 100 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "101",
+          "title": "Section 101 of the Transfer of Property Act",
+          "text": "Statutory text of Section 101 (Section 101 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "102",
+          "title": "Section 102 of the Transfer of Property Act",
+          "text": "Statutory text of Section 102 (Section 102 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "103",
+          "title": "Section 103 of the Transfer of Property Act",
+          "text": "Statutory text of Section 103 (Section 103 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "104",
+          "title": "Section 104 of the Transfer of Property Act",
+          "text": "Statutory text of Section 104 (Section 104 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    },
+    {
+      "number": "V",
+      "title": "OF LEASES OF IMMOVABLE PROPERTY",
+      "sections": [
+        {
+          "number": "105",
+          "title": "Lease defined, Lessor, lessee, premium and rent defined",
+          "text": "Statutory text of Section 105 (Lease defined, Lessor, lessee, premium and rent defined) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "106",
+          "title": "Section 106 of the Transfer of Property Act",
+          "text": "Statutory text of Section 106 (Section 106 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "107",
+          "title": "Section 107 of the Transfer of Property Act",
+          "text": "Statutory text of Section 107 (Section 107 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "108",
+          "title": "Section 108 of the Transfer of Property Act",
+          "text": "Statutory text of Section 108 (Section 108 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "109",
+          "title": "Section 109 of the Transfer of Property Act",
+          "text": "Statutory text of Section 109 (Section 109 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "110",
+          "title": "Section 110 of the Transfer of Property Act",
+          "text": "Statutory text of Section 110 (Section 110 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "111",
+          "title": "Section 111 of the Transfer of Property Act",
+          "text": "Statutory text of Section 111 (Section 111 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "112",
+          "title": "Section 112 of the Transfer of Property Act",
+          "text": "Statutory text of Section 112 (Section 112 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "113",
+          "title": "Section 113 of the Transfer of Property Act",
+          "text": "Statutory text of Section 113 (Section 113 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "114",
+          "title": "Section 114 of the Transfer of Property Act",
+          "text": "Statutory text of Section 114 (Section 114 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "115",
+          "title": "Section 115 of the Transfer of Property Act",
+          "text": "Statutory text of Section 115 (Section 115 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "116",
+          "title": "Section 116 of the Transfer of Property Act",
+          "text": "Statutory text of Section 116 (Section 116 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "117",
+          "title": "Section 117 of the Transfer of Property Act",
+          "text": "Statutory text of Section 117 (Section 117 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    },
+    {
+      "number": "VI",
+      "title": "OF EXCHANGES",
+      "sections": [
+        {
+          "number": "118",
+          "title": "Exchange defined",
+          "text": "Statutory text of Section 118 (Exchange defined) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "119",
+          "title": "Section 119 of the Transfer of Property Act",
+          "text": "Statutory text of Section 119 (Section 119 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "120",
+          "title": "Section 120 of the Transfer of Property Act",
+          "text": "Statutory text of Section 120 (Section 120 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "121",
+          "title": "Section 121 of the Transfer of Property Act",
+          "text": "Statutory text of Section 121 (Section 121 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    },
+    {
+      "number": "VII",
+      "title": "OF GIFTS",
+      "sections": [
+        {
+          "number": "122",
+          "title": "Gift defined",
+          "text": "Statutory text of Section 122 (Gift defined) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "123",
+          "title": "Section 123 of the Transfer of Property Act",
+          "text": "Statutory text of Section 123 (Section 123 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "124",
+          "title": "Section 124 of the Transfer of Property Act",
+          "text": "Statutory text of Section 124 (Section 124 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "125",
+          "title": "Section 125 of the Transfer of Property Act",
+          "text": "Statutory text of Section 125 (Section 125 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "126",
+          "title": "Section 126 of the Transfer of Property Act",
+          "text": "Statutory text of Section 126 (Section 126 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "127",
+          "title": "Section 127 of the Transfer of Property Act",
+          "text": "Statutory text of Section 127 (Section 127 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "128",
+          "title": "Section 128 of the Transfer of Property Act",
+          "text": "Statutory text of Section 128 (Section 128 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "129",
+          "title": "Section 129 of the Transfer of Property Act",
+          "text": "Statutory text of Section 129 (Section 129 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    },
+    {
+      "number": "VIII",
+      "title": "OF TRANSFERS OF ACTIONABLE CLAIMS",
+      "sections": [
+        {
+          "number": "130",
+          "title": "Transfer of actionable claim",
+          "text": "Statutory text of Section 130 (Transfer of actionable claim) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "131",
+          "title": "Section 131 of the Transfer of Property Act",
+          "text": "Statutory text of Section 131 (Section 131 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "132",
+          "title": "Section 132 of the Transfer of Property Act",
+          "text": "Statutory text of Section 132 (Section 132 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "133",
+          "title": "Section 133 of the Transfer of Property Act",
+          "text": "Statutory text of Section 133 (Section 133 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "134",
+          "title": "Section 134 of the Transfer of Property Act",
+          "text": "Statutory text of Section 134 (Section 134 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "135",
+          "title": "Section 135 of the Transfer of Property Act",
+          "text": "Statutory text of Section 135 (Section 135 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "136",
+          "title": "Section 136 of the Transfer of Property Act",
+          "text": "Statutory text of Section 136 (Section 136 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        },
+        {
+          "number": "137",
+          "title": "Section 137 of the Transfer of Property Act",
+          "text": "Statutory text of Section 137 (Section 137 of the Transfer of Property Act) under the Transfer of Property Act, 1882. Use the LexAstra AI assistant to explain this section, review key precedents, or see its relevance in real estate and property disputes."
+        }
+      ]
+    }
+  ]
+}
