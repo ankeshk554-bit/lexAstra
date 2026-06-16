@@ -451,8 +451,9 @@ export default function PDFReaderClient() {
     });
   };
 
-  // Load PDF.js and Google Identity Services SDK from CDN, retrieve annotations/key
+  // Load PDF.js and Google Identity Services SDK from CDN, retrieve annotations/key, and lock body scroll
   useEffect(() => {
+    document.body.classList.add('full-screen-page');
     const storedClientId = localStorage.getItem('lexastra_google_client_id') || '';
 
     if (!window.pdfjsLib) {
@@ -481,6 +482,7 @@ export default function PDFReaderClient() {
     document.body.appendChild(gisScript);
 
     return () => {
+      document.body.classList.remove('full-screen-page');
       // Clean up scripts if we injected them
       const pdfScript = document.querySelector('script[src*="pdf.min.js"]');
       if (pdfScript) document.body.removeChild(pdfScript);

@@ -3645,3 +3645,204 @@ a:hover {
 .chat-messages tr:hover {
   background: rgba(201, 168, 76, 0.05);
 }
+
+/* ==========================================================================
+   Full-Screen Page Layout, Google Sign-in and Auto-Save Status Improvements
+   ========================================================================== */
+
+/* Full Screen Page body rule */
+body.full-screen-page {
+  overflow: hidden !important;
+  height: 100vh;
+}
+body.full-screen-page .footer {
+  display: none !important;
+}
+body.full-screen-page .scroll-progress {
+  display: none !important;
+}
+
+/* Chat Google Sign-In and User Card in Sidebar */
+.chat-sidebar-signin-card {
+  margin: var(--space-md) var(--space-sm);
+  padding: var(--space-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(201, 168, 76, 0.2);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.chat-sidebar-signin-card p {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: var(--space-sm);
+  line-height: 1.4;
+}
+
+#chat-sidebar-google-btn {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.chat-sidebar-user-card {
+  margin: var(--space-md) var(--space-sm);
+  padding: var(--space-md);
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.chat-sidebar-user-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.chat-sidebar-user-card__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold);
+}
+
+.chat-sidebar-user-card__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-sidebar-user-card__name {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--parchment);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-sidebar-user-card__email {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-sidebar-user-card__status {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--gold-light);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.chat-sidebar-user-card__signout {
+  width: 100%;
+  justify-content: center;
+  font-size: 11px;
+  padding: var(--space-xs) var(--space-sm);
+  color: rgba(255, 255, 255, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.chat-sidebar-user-card__signout:hover {
+  color: var(--alert-red) !important;
+  background: rgba(178, 34, 34, 0.1) !important;
+  border-color: var(--alert-red) !important;
+}
+
+/* Chat Input Footer row layout */
+.chat-input-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 800px;
+  margin: 6px auto 0;
+  padding: 0 4px;
+}
+
+.chat-save-status {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.chat-save-status__cloud,
+.chat-save-status__local {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-save-status__cloud {
+  color: var(--gold-dark);
+  font-weight: 500;
+}
+
+.sync-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--charcoal-light);
+  opacity: 0.4;
+}
+
+.sync-dot--active {
+  background: #10B981; /* nice emerald green for active sync */
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  animation: syncPulse 2s infinite ease-in-out;
+}
+
+@keyframes syncPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.chat-input-disclaimer {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* Welcome page Sync Card */
+.chat-welcome-sync-card {
+  max-width: 420px;
+  margin: var(--space-xl) auto 0;
+  padding: var(--space-md);
+  background: rgba(201, 168, 76, 0.05);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.chat-welcome-sync-card h4 {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--navy);
+  margin-bottom: var(--space-xs);
+  font-weight: 600;
+}
+
+.chat-welcome-sync-card p {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  line-height: 1.4;
+}
+
+#chat-welcome-google-btn {
+  display: flex;
+  justify-content: center;
+  min-height: 32px;
+}
