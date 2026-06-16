@@ -221,6 +221,9 @@ export default function AIAssistantClient() {
     setCurrentSessionId(sessions[0].id);
   }
 
+  const currentSession = sessions.find(s => s?.id === currentSessionId) || { messages: [] };
+  const messages = currentSession.messages || [];
+
   const createNewSession = () => {
     const newSession = {
       id: generateId(),
@@ -319,9 +322,6 @@ export default function AIAssistantClient() {
       localStorage.setItem('lexastra_chat_sessions', JSON.stringify(sessions));
     }
   }, [sessions]);
-
-  const currentSession = sessions.find(s => s?.id === currentSessionId) || { messages: [] };
-  const messages = currentSession.messages || [];
 
   const deleteSession = (e, id) => {
     e.stopPropagation();
