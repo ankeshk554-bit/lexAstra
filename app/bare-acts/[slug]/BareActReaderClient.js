@@ -330,7 +330,8 @@ export default function BareActReaderClient({ act }) {
         .act-tab-btn {
           background: transparent;
           border: none;
-          color: var(--white-dim);
+          color: var(--navy-deep);
+          opacity: 0.6;
           font-family: var(--font-primary);
           font-size: var(--text-sm);
           font-weight: 600;
@@ -343,12 +344,15 @@ export default function BareActReaderClient({ act }) {
         }
 
         .act-tab-btn:hover {
-          color: var(--white);
-          background: rgba(255, 255, 255, 0.03);
+          color: var(--navy-deep);
+          opacity: 0.9;
+          background: rgba(0, 0, 0, 0.04);
         }
 
         .act-tab-btn--active {
-          color: var(--gold-bright);
+          color: var(--navy-deep);
+          opacity: 1;
+          font-weight: 700;
         }
 
         .act-tab-btn--active::after {
@@ -357,7 +361,7 @@ export default function BareActReaderClient({ act }) {
           bottom: -2px;
           left: 0;
           right: 0;
-          height: 2px;
+          height: 3px;
           background: var(--gold-bright);
           box-shadow: 0 0 8px var(--gold-glow);
         }
@@ -483,8 +487,16 @@ export default function BareActReaderClient({ act }) {
           background: rgba(244, 162, 97, 0.05);
         }
 
-        /* Right Panel Sections Grid */
+        /* Right Panel Sections Grid - Styled Light for high readability */
         .workspace-content {
+          --glass-bg: #F5F2EB;
+          --glass-border: #D1C4A5;
+          --white: #060f1d;
+          --white-dim: #333333;
+          --gold-bright: #8C6D1F;
+          --gold-glow: rgba(140, 109, 31, 0.3);
+          --navy-mid: #FFFFFF;
+
           background: var(--glass-bg);
           border: 1px solid var(--glass-border);
           border-radius: 12px;
@@ -493,6 +505,7 @@ export default function BareActReaderClient({ act }) {
           display: flex;
           flex-direction: column;
           gap: var(--space-lg);
+          color: var(--white);
         }
 
         .controls-row {
@@ -538,12 +551,16 @@ export default function BareActReaderClient({ act }) {
           font-size: var(--text-sm);
         }
 
+        .search-input::placeholder {
+          color: rgba(6, 15, 29, 0.5);
+        }
+
         .search-icon {
           position: absolute;
           left: var(--space-xs);
           top: 50%;
           transform: translateY(-50%);
-          color: var(--white-dim);
+          color: rgba(6, 15, 29, 0.5);
         }
 
         /* Accordion Row */
@@ -551,13 +568,13 @@ export default function BareActReaderClient({ act }) {
           border: 1px solid var(--glass-border);
           border-radius: 8px;
           margin-bottom: var(--space-xs);
-          background: rgba(255, 255, 255, 0.02);
+          background: #FFFFFF;
           overflow: hidden;
           transition: border-color 0.2s;
         }
 
         .section-accordion:hover {
-          border-color: rgba(244, 162, 97, 0.2);
+          border-color: var(--gold-bright);
         }
 
         .section-header-row {
@@ -583,7 +600,7 @@ export default function BareActReaderClient({ act }) {
         }
 
         .section-badge-id {
-          background: rgba(244, 162, 97, 0.1);
+          background: rgba(201, 168, 76, 0.1);
           border: 1px solid var(--gold-bright);
           color: var(--gold-bright);
           padding: 3px 8px;
@@ -612,7 +629,7 @@ export default function BareActReaderClient({ act }) {
           display: flex;
           gap: var(--space-xs);
           justify-content: flex-end;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          border-top: 1px solid rgba(0, 0, 0, 0.08);
           padding-top: var(--space-sm);
         }
 
@@ -637,7 +654,7 @@ export default function BareActReaderClient({ act }) {
         }
 
         .page-btn {
-          background: var(--glass-bg);
+          background: var(--navy-mid);
           border: 1px solid var(--glass-border);
           color: var(--white);
           padding: var(--space-xs) var(--space-sm);
@@ -648,13 +665,13 @@ export default function BareActReaderClient({ act }) {
         }
 
         .page-btn:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(0, 0, 0, 0.03);
           border-color: var(--gold-bright);
         }
 
         .page-btn--active {
           background: var(--gold-bright);
-          color: var(--navy-deep);
+          color: #FFFFFF !important;
           border-color: var(--gold-bright);
           font-weight: 700;
         }
@@ -714,7 +731,16 @@ export default function BareActReaderClient({ act }) {
           color: var(--navy-deep);
         }
 
+        /* Styled Light for high readability */
         .details-viewer-pane {
+          --glass-bg: #F5F2EB;
+          --glass-border: #D1C4A5;
+          --white: #060f1d;
+          --white-dim: #333333;
+          --gold-bright: #8C6D1F;
+          --gold-glow: rgba(140, 109, 31, 0.3);
+          --navy-mid: #FFFFFF;
+
           background: var(--glass-bg);
           border: 1px solid var(--glass-border);
           border-radius: 12px;
@@ -722,6 +748,7 @@ export default function BareActReaderClient({ act }) {
           display: flex;
           flex-direction: column;
           gap: var(--space-md);
+          color: var(--white);
         }
 
         .parchment-sheet {
