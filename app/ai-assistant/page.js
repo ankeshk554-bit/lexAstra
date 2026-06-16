@@ -763,7 +763,7 @@ export default function AIAssistantPage() {
               ➤
             </button>
           </div>
-          <div style={{ textAlign: 'center', marginTop: '12px', fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.7 }}>
+          <div style={{ textAlign: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.7 }}>
             AI models can make mistakes. Always double-check legal citations and sections.
           </div>
         </div>

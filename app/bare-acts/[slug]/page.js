@@ -42,7 +42,7 @@ export default async function ActPage({ params }) {
 
   return (
     <div className="page-enter">
-      <div className="container" style={{ paddingTop: 'var(--space-2xl)', paddingBottom: 'var(--space-2xl)' }}>
+      <div className="container" style={{ paddingTop: 'var(--space-md)', paddingBottom: 'var(--space-md)' }}>
         <BareActReaderClient key={act.id} act={act} />
       </div>
     </div>

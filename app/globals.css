@@ -62,7 +62,7 @@
   --max-width: 1280px;
   --max-width-narrow: 960px;
   --sidebar-width: 280px;
-  --navbar-height: 72px;
+  --navbar-height: 54px;
 
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(11, 31, 58, 0.06);
@@ -209,7 +209,7 @@ a:hover {
 
 /* ---------- Section ---------- */
 .section {
-  padding: var(--space-4xl) 0;
+  padding: var(--space-2xl) 0;
 }
 
 .section--navy {
@@ -1194,9 +1194,9 @@ a:hover {
 
 .chat-disclaimer {
   font-family: var(--font-ui);
-  font-size: var(--text-xs);
+  font-size: 11px;
   text-align: center;
-  padding: 8px var(--space-md);
+  padding: 4px var(--space-md);
   background: rgba(201, 168, 76, 0.1);
   color: var(--gold-dark);
   border-bottom: 1px solid var(--border-subtle);
@@ -1207,7 +1207,7 @@ a:hover {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-xl) 0 120px 0;
+  padding: var(--space-md) 0 80px 0;
   scroll-behavior: smooth;
   display: flex;
   flex-direction: column;
@@ -1249,7 +1249,7 @@ a:hover {
 }
 
 .chat-message-wrapper {
-  padding: var(--space-md) var(--space-xl);
+  padding: 10px 16px;
   width: 100%;
   animation: messageSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
@@ -1320,7 +1320,7 @@ a:hover {
   bottom: 0;
   left: 0;
   width: 100%;
-  padding: var(--space-xl);
+  padding: 8px 16px;
   background: linear-gradient(transparent, var(--parchment-light) 30%);
   z-index: 10;
 }
@@ -1333,11 +1333,11 @@ a:hover {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-gold);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: flex-end;
-  padding: 8px 12px;
+  padding: 4px 8px;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -2247,7 +2247,7 @@ a:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
+  padding: 6px 16px;
   border-bottom: 1px solid rgba(201, 168, 76, 0.3);
   box-shadow: var(--shadow-sm);
   z-index: 4;
@@ -2505,7 +2505,7 @@ a:hover {
 }
 
 .pdf-chat-header {
-  padding: 16px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
@@ -2524,7 +2524,7 @@ a:hover {
 .pdf-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 0;
+  padding: 8px 0;
   background: var(--parchment-light);
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.1) transparent;
@@ -2568,12 +2568,12 @@ a:hover {
 }
 
 .pdf-chat-controls {
-  padding: 16px;
+  padding: 10px 14px;
   border-top: 1px solid var(--border-subtle);
   background: #ffffff;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .context-modes {
@@ -3425,11 +3425,11 @@ a:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 24px;
+  padding: 6px 16px;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-subtle);
-  gap: var(--space-md);
+  gap: 8px;
   z-index: 10;
 }
 
@@ -3447,7 +3447,7 @@ a:hover {
 }
 
 .exam-selector-dropdown {
-  padding: 8px 16px;
+  padding: 4px 10px;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   font-weight: 500;

@@ -30,7 +30,7 @@ export default async function ExamPage({ params }) {
 
   return (
     <div className="page-enter">
-      <div className="container" style={{ paddingTop: 'var(--space-2xl)' }}>
+      <div className="container" style={{ paddingTop: 'var(--space-md)' }}>
         <div className="breadcrumb">
           <Link href="/">Home</Link>
           <span className="breadcrumb__separator">/</span>
