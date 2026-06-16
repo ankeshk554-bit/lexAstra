@@ -336,7 +336,7 @@ export default function AIAssistantClient() {
     }
   };
 
-  const lastMessageContentLength = messages[messages.length - 1]?.content.length || 0;
+  const lastMessageContentLength = messages[messages.length - 1]?.content?.length || 0;
   useEffect(() => {
     scrollToBottom();
   }, [lastMessageContentLength, isLoading, currentSessionId]);
