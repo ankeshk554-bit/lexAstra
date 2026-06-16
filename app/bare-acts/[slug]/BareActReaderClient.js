@@ -899,7 +899,7 @@ export default function BareActReaderClient({ act }) {
                       >
                         <div className="section-header-left">
                           <span className="section-badge-id">{sectionLabel} {sec.number}</span>
-                          <span style={{ color: isExpanded ? 'var(--gold-bright)' : '#ffffff' }}>{sec.title}</span>
+                          <span style={{ color: isExpanded ? 'var(--gold-bright)' : 'inherit' }}>{sec.title}</span>
                         </div>
                         <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                           ▼
@@ -1045,7 +1045,7 @@ export default function BareActReaderClient({ act }) {
                             >
                               <div className="section-header-left">
                                 <span className="section-badge-id" style={{ minWidth: '80px', textAlign: 'center' }}>Rule {rule.number}</span>
-                                <span style={{ color: isExpanded ? 'var(--gold-bright)' : '#ffffff' }}>{rule.title}</span>
+                                <span style={{ color: isExpanded ? 'var(--gold-bright)' : 'inherit' }}>{rule.title}</span>
                               </div>
                               <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                                 ▼
