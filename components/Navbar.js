@@ -22,7 +22,12 @@ export default function Navbar() {
     // Check if user is already logged in
     const storedUser = localStorage.getItem('lexastra_google_user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error('Error parsing stored user:', e);
+        localStorage.removeItem('lexastra_google_user');
+      }
     }
 
     // Load Google GSI Client
@@ -41,7 +46,16 @@ export default function Navbar() {
 
     const handleSignInSync = () => {
       const stored = localStorage.getItem('lexastra_google_user');
-      setUser(stored ? JSON.parse(stored) : null);
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch (e) {
+          localStorage.removeItem('lexastra_google_user');
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
     };
 
     window.addEventListener('google-signin', handleSignInSync);

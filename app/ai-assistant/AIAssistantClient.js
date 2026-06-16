@@ -164,8 +164,13 @@ export default function AIAssistantClient() {
         if (!storedSessions.includes('"data: {"') && !storedSessions.includes('"index":0,"delta"')) {
           try {
             const parsed = JSON.parse(storedSessions);
-            if (parsed.length > 0) return parsed;
-          } catch (e) {}
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed.filter(s => s && typeof s === 'object' && s.id);
+            }
+          } catch (e) {
+            console.error('Error parsing stored chat sessions:', e);
+            localStorage.removeItem('lexastra_chat_sessions');
+          }
         } else {
           localStorage.removeItem('lexastra_chat_sessions');
         }
@@ -247,7 +252,17 @@ export default function AIAssistantClient() {
     
     const checkGoogleUser = () => {
       const stored = localStorage.getItem('lexastra_google_user');
-      setGoogleUser(stored ? JSON.parse(stored) : null);
+      if (stored) {
+        try {
+          setGoogleUser(JSON.parse(stored));
+        } catch (e) {
+          console.error('Error parsing Google user:', e);
+          localStorage.removeItem('lexastra_google_user');
+          setGoogleUser(null);
+        }
+      } else {
+        setGoogleUser(null);
+      }
     };
     checkGoogleUser();
 
@@ -305,7 +320,7 @@ export default function AIAssistantClient() {
     }
   }, [sessions]);
 
-  const currentSession = sessions.find(s => s.id === currentSessionId) || { messages: [] };
+  const currentSession = sessions.find(s => s?.id === currentSessionId) || { messages: [] };
   const messages = currentSession.messages || [];
 
   const deleteSession = (e, id) => {
@@ -633,7 +648,7 @@ export default function AIAssistantClient() {
         <div className="chat-sidebar__history">
           <div className="chat-history-group">
             <div className="chat-history-group__title">Your Conversations</div>
-            {sessions.map(session => (
+            {sessions.filter(Boolean).map(session => (
               <button 
                 key={session.id}
                 className={`chat-history-item ${currentSessionId === session.id ? 'chat-history-item--active' : ''}`}
