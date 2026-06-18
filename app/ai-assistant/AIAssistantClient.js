@@ -192,13 +192,7 @@ export default function AIAssistantClient() {
     return 'General';
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_deepseek_key') || '';
-    }
-    return '';
-  });
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [showLocalProfileModal, setShowLocalProfileModal] = useState(false);
   const [localProfileInput, setLocalProfileInput] = useState('');
@@ -381,12 +375,7 @@ export default function AIAssistantClient() {
     }
   };
 
-  const handleSaveKey = () => {
-    if (apiKey.trim()) {
-      localStorage.setItem('lexastra_deepseek_key', apiKey.trim());
-      setShowApiKeyInput(false);
-    }
-  };
+
 
   const handleSignOut = () => {
     localStorage.removeItem('lexastra_google_user');
@@ -399,7 +388,7 @@ export default function AIAssistantClient() {
       const backupData = {};
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode')) {
+        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode')) {
           backupData[key] = localStorage.getItem(key);
         }
       }
@@ -430,7 +419,7 @@ export default function AIAssistantClient() {
         let restoredCount = 0;
         
         for (const key in backupData) {
-          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode') {
+          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode') {
             localStorage.setItem(key, backupData[key]);
             restoredCount++;
           }
@@ -532,15 +521,14 @@ export default function AIAssistantClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(apiKey && { 'x-api-key': apiKey }),
         },
         body: JSON.stringify({ messages: updatedMessages, examMode }),
         signal: abortControllerRef.current.signal
       });
 
       if (response.status === 401) {
-        setShowApiKeyInput(true);
         setIsLoading(false);
+        alert('Authentication failed. Please verify that the server-side API key is set.');
         return;
       }
 
@@ -887,25 +875,6 @@ export default function AIAssistantClient() {
                 <button className="btn btn--ghost" onClick={() => setShowBackupModal(false)}>Close</button>
               </div>
             </div>
-          ) : showApiKeyInput ? (
-            <div className="api-key-section" style={{ margin: 'auto', maxWidth: '500px', background: 'var(--bg-card)', padding: '32px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)' }}>
-              <h3 style={{ marginBottom: '16px', color: 'var(--navy)' }}>API Configuration</h3>
-              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
-                Please enter your DeepSeek API key to unlock the AI Assistant. This key is stored securely in your browser&apos;s local storage.
-              </p>
-              <input
-                type="password"
-                className="search-bar__input"
-                style={{ paddingLeft: '24px', marginBottom: '24px' }}
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button className="btn btn--ghost" onClick={() => setShowApiKeyInput(false)}>Cancel</button>
-                <button className="btn btn--primary" onClick={handleSaveKey}>Save Key</button>
-              </div>
-            </div>
           ) : messages.length === 0 ? (
             <div className="chat-welcome">
               <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>What legal topic shall we explore?</h2>
@@ -1029,13 +998,13 @@ export default function AIAssistantClient() {
                 }
               }}
               rows={1}
-              disabled={isLoading || showApiKeyInput}
+              disabled={isLoading}
             />
             <button 
               id="ai-send-btn"
               className="chat-send-btn"
               onClick={() => handleSend(input)}
-              disabled={!input.trim() || isLoading || showApiKeyInput}
+              disabled={!input.trim() || isLoading}
             >
               ➤
             </button>

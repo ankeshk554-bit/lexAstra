@@ -406,13 +406,7 @@ export default function PDFReaderClient() {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [contextMode, setContextMode] = useState('search'); // 'search' | 'current' | 'selection'
-  const [apiKey, setApiKey] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_deepseek_key') || '';
-    }
-    return '';
-  });
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+
   const [examMode, setExamMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('lexastra_exam_mode') || 'General';
@@ -433,7 +427,7 @@ export default function PDFReaderClient() {
       const backupData = {};
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode')) {
+        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode')) {
           backupData[key] = localStorage.getItem(key);
         }
       }
@@ -464,7 +458,7 @@ export default function PDFReaderClient() {
         let restoredCount = 0;
         
         for (const key in backupData) {
-          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode') {
+          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode') {
             localStorage.setItem(key, backupData[key]);
             restoredCount++;
           }
@@ -1079,14 +1073,13 @@ export default function PDFReaderClient() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(apiKey && { 'x-api-key': apiKey }),
         },
         body: JSON.stringify({ messages: payloadMessages, examMode }),
       });
 
       if (response.status === 401) {
-        setShowApiKeyInput(true);
         setIsChatLoading(false);
+        setChatHistory(prev => [...prev, { role: 'assistant', content: 'Authentication failed. Please verify that the server-side API key is set.' }]);
         return;
       }
 
@@ -1878,31 +1871,7 @@ export default function PDFReaderClient() {
             <div ref={chatEndRef} />
           </div>
 
-          {/* API Key Modal Fallback */}
-          {showApiKeyInput && (
-            <div className="pdf-chat-api-fallback">
-              <AlertCircle size={20} style={{ color: 'var(--alert-red)' }} />
-              <p>Please configure your DeepSeek API key to chat with the AI.</p>
-              <input 
-                type="password"
-                placeholder="Paste DeepSeek API Key..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="api-key-input"
-              />
-              <button 
-                onClick={() => {
-                  if (apiKey.trim()) {
-                    localStorage.setItem('lexastra_deepseek_key', apiKey.trim());
-                    setShowApiKeyInput(false);
-                  }
-                }}
-                className="btn btn--gold-fill btn--small"
-              >
-                Save Key
-              </button>
-            </div>
-          )}
+
 
           {/* Controls & Chat Input */}
           <div className="pdf-chat-controls">
