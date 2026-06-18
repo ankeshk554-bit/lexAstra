@@ -426,41 +426,66 @@ export default function PDFReaderClient() {
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const libraryFileInputRef = useRef(null);
+  const backupFileInputRef = useRef(null);
 
-  const initGoogleClient = (clientId) => {
-    if (!window.google?.accounts?.oauth2) return;
-    
-    // Placeholder Client ID to trigger Google accounts choice dialog immediately
-    const effectiveClientId = clientId || '1048602693895-placeholder.apps.googleusercontent.com';
-    
-    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-      client_id: effectiveClientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      callback: (response) => {
-        if (response.error) {
-          console.error('Google Auth Error:', response.error);
-          setDriveStatus('Authentication Error: ' + response.error);
-          return;
+  const handleExportBackup = () => {
+    try {
+      const backupData = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode')) {
+          backupData[key] = localStorage.getItem(key);
         }
-        
-        if (response.access_token) {
-          setDriveConnected(true);
-          setDriveStatus('Synchronizing annotations & catalog library with Google Drive...');
-          setDriveSyncing(true);
-          
-          setTimeout(() => {
-            setDriveSyncing(false);
-            setDriveStatus(`Sync successful! Token: ${response.access_token.substring(0, 12)}... (AppData folder synchronized)`);
-          }, 2000);
-        }
-      },
-    });
+      }
+      
+      const jsonString = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `lexastra_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Error creating backup: ' + err.message);
+    }
   };
 
-  // Load PDF.js and Google Identity Services SDK from CDN, retrieve annotations/key, and lock body scroll
+  const handleImportBackup = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const backupData = JSON.parse(event.target.result);
+        let restoredCount = 0;
+        
+        for (const key in backupData) {
+          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode') {
+            localStorage.setItem(key, backupData[key]);
+            restoredCount++;
+          }
+        }
+        
+        if (restoredCount > 0) {
+          alert('Backup restored successfully! The page will now reload.');
+          window.location.reload();
+        } else {
+          alert('Invalid backup file or no valid data found.');
+        }
+      } catch (err) {
+        alert('Error restoring backup: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Load PDF.js and lock body scroll
   useEffect(() => {
     document.body.classList.add('full-screen-page');
-    const storedClientId = localStorage.getItem('lexastra_google_client_id') || '';
 
     if (!window.pdfjsLib) {
       const link = document.createElement('link');
@@ -475,33 +500,16 @@ export default function PDFReaderClient() {
         setPdfjsLoaded(true);
       };
       document.body.appendChild(script);
+    } else {
+      setPdfjsLoaded(true);
     }
-
-    // Google Identity Services Script
-    const gisScript = document.createElement('script');
-    gisScript.src = 'https://accounts.google.com/gsi/client';
-    gisScript.async = true;
-    gisScript.defer = true;
-    gisScript.onload = () => {
-      initGoogleClient(storedClientId);
-    };
-    document.body.appendChild(gisScript);
 
     return () => {
       document.body.classList.remove('full-screen-page');
-      // Clean up scripts if we injected them
       const pdfScript = document.querySelector('script[src*="pdf.min.js"]');
       if (pdfScript) document.body.removeChild(pdfScript);
-      document.body.removeChild(gisScript);
     };
   }, []);
-
-  const handleSaveClientId = (newId) => {
-    const trimmed = newId.trim();
-    setGoogleClientId(trimmed);
-    localStorage.setItem('lexastra_google_client_id', trimmed);
-    initGoogleClient(trimmed);
-  };
 
   // Fetch local books catalog on load
   useEffect(() => {
@@ -817,30 +825,7 @@ export default function PDFReaderClient() {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Drive Sync Handler (Triggers Google OAuth Login Popup)
-  const handleDriveSync = () => {
-    if (!tokenClientRef.current) {
-      alert('Google Auth SDK is still loading. Please try again in a moment.');
-      return;
-    }
-    
-    setDriveSyncing(true);
-    setDriveStatus('Requesting access to Google account...');
-    
-    try {
-      // Trigger the official Google Account Chooser popup window!
-      tokenClientRef.current.requestAccessToken();
-    } catch (err) {
-      console.error('OAuth trigger error:', err);
-      setDriveSyncing(false);
-      setDriveStatus('Failed to launch popup: ' + err.message);
-    }
-  };
-
-  const handleDisconnectDrive = () => {
-    setDriveConnected(false);
-    setDriveStatus('Disconnected');
-  };
+  // Backup and restore helpers are defined above
 
   // Text selection tracking
   const handleTextSelection = () => {
@@ -1460,7 +1445,7 @@ export default function PDFReaderClient() {
                 className="btn btn--gold-fill" 
                 style={{ gap: '8px' }}
               >
-                <Cloud size={16} /> Drive Cloud Sync
+                <Database size={16} /> Backup & Restore
               </button>
             </div>
 
@@ -2003,97 +1988,50 @@ export default function PDFReaderClient() {
         </section>
       )}
 
-      {/* 5. Google Drive Sync Dashboard Modal */}
+      {/* 5. Local Backup & Restore Console Modal */}
       {showDriveModal && (
         <div className="pdf-modal-overlay">
-          <div className="pdf-modal-content">
+          <div className="pdf-modal-content" style={{ maxWidth: '450px' }}>
             <div className="pdf-modal-header">
-              <h3><Cloud size={20} style={{ color: '#4285F4', verticalAlign: 'middle', marginRight: '8px' }} /> Google Drive Cloud Sync</h3>
+              <h3><Database size={20} style={{ color: 'var(--gold)', verticalAlign: 'middle', marginRight: '8px' }} /> Backup & Restore Workspace</h3>
               <button onClick={() => setShowDriveModal(false)} className="close-modal-btn">
                 <X size={18} />
               </button>
             </div>
             
-            <div className="pdf-modal-body">
-              <div className="sync-status-box" style={{ background: driveConnected ? 'rgba(39, 174, 96, 0.08)' : 'rgba(0,0,0,0.03)', border: `1px solid ${driveConnected ? 'rgba(39, 174, 96, 0.2)' : 'rgba(0,0,0,0.1)'}` }}>
-                <HardDrive size={36} style={{ color: driveConnected ? '#27AE60' : '#4a4a4a', marginBottom: '8px' }} />
-                <h4>Connection Status: {driveConnected ? 'CONNECTED' : 'NOT CONNECTED'}</h4>
-                <p className="sync-detail">{driveStatus}</p>
-              </div>
-
-              <div className="sync-instructions">
-                <h5>About Google Drive Sync:</h5>
-                <p>Google Drive Sync allows you to back up your local library textbook catalog and highlights/notes to a secure `/LexAstra_Library/` folder in your personal drive, keeping your data safe across multiple devices.</p>
-              </div>
-
-              <div className="form-group" style={{ margin: '8px 0' }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Google OAuth Client ID (Optional):</label>
-                <input 
-                  type="text" 
-                  placeholder="Paste your Google Client ID here..."
-                  value={googleClientId}
-                  onChange={(e) => handleSaveClientId(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: '6px',
-                    outline: 'none',
-                    fontFamily: 'var(--font-mono)',
-                    marginTop: '4px'
-                  }}
-                />
-                <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.3' }}>
-                  * Leave blank to run in demo mode (uses a placeholder Client ID to trigger the Google accountChooser dialog). To configure a real client ID, create an OAuth Web Client in your Google Cloud Console.
+            <div className="pdf-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="sync-status-box" style={{ background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.15)', textAlign: 'center', padding: '16px', borderRadius: '8px' }}>
+                <HardDrive size={36} style={{ color: 'var(--gold)', marginBottom: '8px', display: 'inline-block' }} />
+                <h4>Workspace Backups</h4>
+                <p className="sync-detail" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Save your highlights, annotations, notes, and AI conversations to a single file. Restore it anytime to resume studying on another browser.
                 </p>
               </div>
 
-              <div className="sync-actions">
-                {!driveConnected ? (
-                  <button 
-                    onClick={handleDriveSync} 
-                    className="btn btn--gold-fill" 
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    disabled={driveSyncing}
-                  >
-                    {driveSyncing ? (
-                      <>
-                        <RefreshCw size={16} className="indexing-icon" style={{ marginRight: '8px' }} /> Connecting to Google Drive...
-                      </>
-                    ) : (
-                      <>
-                        Connect Google Account & Sync
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                    <button 
-                      onClick={handleDriveSync} 
-                      className="btn btn--gold-fill" 
-                      style={{ width: '100%', justifyContent: 'center' }}
-                      disabled={driveSyncing}
-                    >
-                      {driveSyncing ? (
-                        <>
-                          <RefreshCw size={16} className="indexing-icon" style={{ marginRight: '8px' }} /> Backing up to Cloud...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw size={16} style={{ marginRight: '8px' }} /> Synchronize Now
-                        </>
-                      )}
-                    </button>
-                    <button 
-                      onClick={handleDisconnectDrive} 
-                      className="btn btn--ghost" 
-                      style={{ width: '100%', justifyContent: 'center', color: 'var(--alert-red)', hoverBackground: 'rgba(178,34,34,0.08)' }}
-                    >
-                      Disconnect Google Drive Account
-                    </button>
-                  </div>
-                )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button 
+                  onClick={handleExportBackup} 
+                  className="btn btn--gold-fill" 
+                  style={{ width: '100%', justifyContent: 'center', gap: '8px' }}
+                >
+                  <Download size={16} /> Export JSON Backup File
+                </button>
+                
+                <button 
+                  onClick={() => backupFileInputRef.current?.click()} 
+                  className="btn btn--ghost" 
+                  style={{ width: '100%', justifyContent: 'center', gap: '8px', border: '1px solid var(--border-subtle)' }}
+                >
+                  <Upload size={16} /> Restore from Backup File
+                </button>
+                
+                <input 
+                  type="file" 
+                  ref={backupFileInputRef} 
+                  onChange={handleImportBackup} 
+                  accept=".json" 
+                  style={{ display: 'none' }} 
+                />
               </div>
             </div>
           </div>

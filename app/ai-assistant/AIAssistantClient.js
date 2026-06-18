@@ -199,13 +199,9 @@ export default function AIAssistantClient() {
     return '';
   });
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [showGoogleConfig, setShowGoogleConfig] = useState(false);
-  const [tempGoogleId, setTempGoogleId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_google_client_id') || '';
-    }
-    return '';
-  });
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showLocalProfileModal, setShowLocalProfileModal] = useState(false);
+  const [localProfileInput, setLocalProfileInput] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [googleUser, setGoogleUser] = useState(null);
@@ -235,6 +231,7 @@ export default function AIAssistantClient() {
   const userHasScrolledUp = useRef(false);
   const abortControllerRef = useRef(null);
   const streamBufferRef = useRef('');
+  const backupFileInputRef = useRef(null);
 
   if (currentSessionId === null && sessions.length > 0) {
     setCurrentSessionId(sessions[0].id);
@@ -303,37 +300,37 @@ export default function AIAssistantClient() {
     };
   }, []);
 
-  // Render Google Sign-In Buttons when user is logged out or when switching sessions/welcome screen
+  // Profile check hook only
   useEffect(() => {
-    const renderButtons = () => {
-      if (!window.google?.accounts?.id || googleUser) return;
-
-      const sidebarContainer = document.getElementById('chat-sidebar-google-btn');
-      if (sidebarContainer) {
-        window.google.accounts.id.renderButton(sidebarContainer, {
-          theme: 'outline',
-          size: 'medium',
-          shape: 'pill',
-          width: 240
-        });
-      }
-
-      const welcomeContainer = document.getElementById('chat-welcome-google-btn');
-      if (welcomeContainer) {
-        window.google.accounts.id.renderButton(welcomeContainer, {
-          theme: 'outline',
-          size: 'medium',
-          shape: 'pill',
-          width: 240
-        });
+    const checkGoogleUser = () => {
+      const stored = localStorage.getItem('lexastra_google_user');
+      if (stored) {
+        try {
+          setGoogleUser(JSON.parse(stored));
+        } catch (e) {
+          console.error('Error parsing Google user:', e);
+          localStorage.removeItem('lexastra_google_user');
+          setGoogleUser(null);
+        }
+      } else {
+        setGoogleUser(null);
       }
     };
+    checkGoogleUser();
 
-    if (mounted && !googleUser) {
-      const timer = setTimeout(renderButtons, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [googleUser, mounted, currentSessionId, messages.length]);
+    window.addEventListener('google-signin', checkGoogleUser);
+    window.addEventListener('google-signout', checkGoogleUser);
+
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+
+    return () => {
+      window.removeEventListener('google-signin', checkGoogleUser);
+      window.removeEventListener('google-signout', checkGoogleUser);
+      clearTimeout(timer);
+    };
+  }, []);
 
   // Save sessions to local storage whenever they change
   useEffect(() => {
@@ -391,18 +388,65 @@ export default function AIAssistantClient() {
     }
   };
 
-  const handleGoogleSignOut = () => {
+  const handleSignOut = () => {
     localStorage.removeItem('lexastra_google_user');
     setGoogleUser(null);
     window.dispatchEvent(new Event('google-signout'));
   };
 
-  const handleSaveGoogleId = () => {
-    if (tempGoogleId.trim()) {
-      localStorage.setItem('lexastra_google_client_id', tempGoogleId.trim());
-      setShowGoogleConfig(false);
-      window.location.reload();
+  const handleExportBackup = () => {
+    try {
+      const backupData = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode')) {
+          backupData[key] = localStorage.getItem(key);
+        }
+      }
+      
+      const jsonString = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `lexastra_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Error creating backup: ' + err.message);
     }
+  };
+
+  const handleImportBackup = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const backupData = JSON.parse(event.target.result);
+        let restoredCount = 0;
+        
+        for (const key in backupData) {
+          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_deepseek_key' || key === 'lexastra_exam_mode') {
+            localStorage.setItem(key, backupData[key]);
+            restoredCount++;
+          }
+        }
+        
+        if (restoredCount > 0) {
+          alert('Backup restored successfully! The page will now reload.');
+          window.location.reload();
+        } else {
+          alert('Invalid backup file or no valid data found.');
+        }
+      } catch (err) {
+        alert('Error restoring backup: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleCopy = (content, index) => {
@@ -683,24 +727,48 @@ export default function AIAssistantClient() {
           </div>
         </div>
         
-        {/* Google User Profile Card / Sign In Prompt */}
+        {/* User Profile Card / Local Sign In Prompt */}
         {!googleUser ? (
-          <div className="chat-sidebar-signin-card">
-            <p>Sign in to automatically save and sync your conversations</p>
-            <div id="chat-sidebar-google-btn"></div>
+          <div className="chat-sidebar-signin-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+            <p style={{ margin: 0, fontSize: '12px', opacity: 0.7, marginBottom: '8px' }}>Create a profile to save your workspace progress.</p>
+            <button 
+              onClick={() => setShowLocalProfileModal(true)} 
+              className="btn btn--primary btn--small" 
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              Set Up Profile
+            </button>
           </div>
         ) : (
           <div className="chat-sidebar-user-card">
             <div className="chat-sidebar-user-card__header">
-              <img src={googleUser.picture} alt={googleUser.name} className="chat-sidebar-user-card__avatar" />
+              <div 
+                style={{ 
+                  width: '36px', 
+                  height: '36px', 
+                  borderRadius: '50%', 
+                  background: '#C9A84C', 
+                  color: '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '14px', 
+                  fontWeight: 'bold', 
+                  border: '1px solid var(--gold)',
+                  marginRight: '12px',
+                  flexShrink: 0
+                }}
+              >
+                {googleUser.name.substring(0, 2).toUpperCase()}
+              </div>
               <div className="chat-sidebar-user-card__info">
                 <span className="chat-sidebar-user-card__name">{googleUser.name}</span>
                 <span className="chat-sidebar-user-card__email">{googleUser.email}</span>
-                <span className="chat-sidebar-user-card__status">✓ Cloud Sync Active</span>
+                <span className="chat-sidebar-user-card__status">✓ Local Profile Active</span>
               </div>
             </div>
             <button 
-              onClick={handleGoogleSignOut} 
+              onClick={handleSignOut} 
               className="btn btn--ghost btn--small chat-sidebar-user-card__signout"
             >
               Sign Out
@@ -716,10 +784,10 @@ export default function AIAssistantClient() {
             Configure DeepSeek Key
           </button>
           <button 
-            onClick={() => setShowGoogleConfig(true)} 
+            onClick={() => setShowBackupModal(true)} 
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
           >
-            Configure Google Sign-in ID
+            Backup & Restore Workspace
           </button>
         </div>
       </aside>
@@ -788,33 +856,41 @@ export default function AIAssistantClient() {
         </div>
 
         <div className="chat-messages" ref={chatContainerRef} onScroll={handleScroll}>
-          {showGoogleConfig ? (
+          {showBackupModal ? (
             <div className="api-key-section" style={{ margin: 'auto', maxWidth: '500px', background: 'var(--bg-card)', padding: '32px', borderRadius: '16px', boxShadow: 'var(--shadow-lg)', textAlign: 'left' }}>
-              <h3 style={{ marginBottom: '16px', color: 'var(--navy)' }}>Google Sign-in ID</h3>
-              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                To enable Google Sign-in, enter your Google OAuth Client ID. 
+              <h3 style={{ marginBottom: '16px', color: 'var(--navy)' }}>Backup & Restore Workspace</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
+                Save your workspace progress, including highlights, annotations, notes, and all AI conversation sessions, to a single file. You can upload this file later to restore your work.
               </p>
-              <div style={{ background: 'rgba(201,168,76,0.08)', padding: '12px', borderRadius: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.4' }}>
-                <strong>How to get it:</strong>
-                <ol style={{ marginLeft: '16px', marginTop: '6px' }}>
-                  <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--gold-dark)' }}>Google Cloud Console</a>.</li>
-                  <li>Create a project, navigate to <strong>APIs & Services &gt; Credentials</strong>.</li>
-                  <li>Create an <strong>OAuth Client ID</strong> (Web Application).</li>
-                  <li>Add <code>http://localhost:3000</code> and your production Vercel URL to <strong>Authorized JavaScript Origins</strong>.</li>
-                  <li>Copy the Client ID and paste it below.</li>
-                </ol>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
+                <button 
+                  className="btn btn--gold-fill" 
+                  onClick={handleExportBackup} 
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  Export JSON Backup File
+                </button>
+                
+                <button 
+                  className="btn btn--ghost" 
+                  onClick={() => backupFileInputRef.current?.click()} 
+                  style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--border-subtle)' }}
+                >
+                  Restore from Backup File
+                </button>
+                
+                <input 
+                  type="file" 
+                  ref={backupFileInputRef} 
+                  onChange={handleImportBackup} 
+                  accept=".json" 
+                  style={{ display: 'none' }} 
+                />
               </div>
-              <input
-                type="text"
-                className="search-bar__input"
-                style={{ paddingLeft: '24px', marginBottom: '24px' }}
-                placeholder="123456-abcde.apps.googleusercontent.com"
-                value={tempGoogleId}
-                onChange={(e) => setTempGoogleId(e.target.value)}
-              />
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button className="btn btn--ghost" onClick={() => setShowGoogleConfig(false)}>Cancel</button>
-                <button className="btn btn--primary" onClick={handleSaveGoogleId}>Save & Reload</button>
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button className="btn btn--ghost" onClick={() => setShowBackupModal(false)}>Close</button>
               </div>
             </div>
           ) : showApiKeyInput ? (
@@ -842,10 +918,16 @@ export default function AIAssistantClient() {
               <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>I can assist with case analysis, exam preparation, drafting, or visual flowcharts.</p>
               
               {!googleUser && (
-                <div className="chat-welcome-sync-card">
-                  <h4>Enable Automatic Cloud Saving</h4>
-                  <p>Sign in with Google to sync your chats across devices and ensure they are automatically saved.</p>
-                  <div id="chat-welcome-google-btn"></div>
+                <div className="chat-welcome-sync-card" style={{ padding: '20px', background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.15)', borderRadius: '12px', textAlign: 'center', maxWidth: '450px', margin: '20px auto 0 auto' }}>
+                  <h4 style={{ color: 'var(--navy)', marginBottom: '8px', fontSize: '16px', fontWeight: 'bold' }}>Create Local Profile</h4>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.4' }}>Set up a local profile username to save your conversations, notes, and textbook highlights inside this browser.</p>
+                  <button 
+                    onClick={() => setShowLocalProfileModal(true)} 
+                    className="btn btn--primary btn--small"
+                    style={{ margin: '0 auto' }}
+                  >
+                    Set Up Profile
+                  </button>
                 </div>
               )}
 
@@ -967,12 +1049,12 @@ export default function AIAssistantClient() {
           <div className="chat-input-footer-row">
             <div className="chat-save-status">
               {googleUser ? (
-                <span className="chat-save-status__cloud" title="Synced with Google profile">
-                  <span className="sync-dot sync-dot--active"></span>
-                  Auto-saved to Cloud ({googleUser.email})
+                <span className="chat-save-status__cloud" style={{ color: '#27AE60' }} title="Saved locally under active profile">
+                  <span className="sync-dot sync-dot--active" style={{ background: '#27AE60' }}></span>
+                  Auto-saved to Profile ({googleUser.name})
                 </span>
               ) : (
-                <span className="chat-save-status__local" title="Saved locally in browser storage. Sign in to enable cloud sync.">
+                <span className="chat-save-status__local" title="Saved locally in browser storage. Create a profile to manage progress.">
                   <span className="sync-dot"></span>
                   Auto-saved locally
                 </span>
@@ -984,6 +1066,110 @@ export default function AIAssistantClient() {
           </div>
         </div>
       </main>
+
+      {showLocalProfileModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(11, 31, 58, 0.6)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 999999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            background: '#F5F2EB',
+            border: '1px solid #D1C4A5',
+            borderRadius: '16px',
+            padding: '24px 32px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            color: '#0B1F3A',
+            position: 'relative',
+            textAlign: 'left'
+          }}>
+            <button 
+              onClick={() => setShowLocalProfileModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#666',
+                fontSize: '18px'
+              }}
+            >
+              ✕
+            </button>
+            
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0B1F3A', marginBottom: '8px' }}>
+              Create Local Profile
+            </h3>
+            <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
+              Enter your name or email to sync your textbook highlights, notes, and AI conversations locally.
+            </p>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!localProfileInput.trim()) return;
+              const trimmed = localProfileInput.trim();
+              const isEmail = trimmed.includes('@');
+              const name = isEmail ? trimmed.split('@')[0] : trimmed;
+              const email = isEmail ? trimmed : `${trimmed.toLowerCase()}@local`;
+              const profile = {
+                name,
+                email,
+                picture: '',
+                token: 'dummy-token-' + Math.random().toString(36).substring(2, 10)
+              };
+              localStorage.setItem('lexastra_google_user', JSON.stringify(profile));
+              setGoogleUser(profile);
+              setShowLocalProfileModal(false);
+              setLocalProfileInput('');
+              window.dispatchEvent(new Event('google-signin'));
+            }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  Name or Email:
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g., Ankes or user@email.com"
+                  value={localProfileInput}
+                  onChange={(e) => setLocalProfileInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1C4A5',
+                    background: '#ffffff',
+                    color: '#0B1F3A',
+                    outline: 'none'
+                  }}
+                  autoFocus
+                />
+              </div>
+              
+              <button 
+                type="submit" 
+                className="btn btn--gold-fill" 
+                style={{ width: '100%', justifyContent: 'center', padding: '10px', borderRadius: '8px' }}
+              >
+                Create Profile
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

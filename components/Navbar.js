@@ -16,6 +16,8 @@ const navLinks = [
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [signInInput, setSignInInput] = useState('');
   const pathname = usePathname();
 
   useEffect(() => {
@@ -28,20 +30,6 @@ export default function Navbar() {
         console.error('Error parsing stored user:', e);
         localStorage.removeItem('lexastra_google_user');
       }
-    }
-
-    // Load Google GSI Client
-    if (!window.google?.accounts?.id) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        initGoogleSignIn();
-      };
-      document.body.appendChild(script);
-    } else {
-      initGoogleSignIn();
     }
 
     const handleSignInSync = () => {
@@ -67,63 +55,27 @@ export default function Navbar() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!user && window.google?.accounts?.id) {
-      setTimeout(() => {
-        const container = document.getElementById('google-signin-btn');
-        if (container) {
-          window.google.accounts.id.renderButton(container, {
-            theme: 'outline',
-            size: 'medium',
-            shape: 'pill'
-          });
-        }
-        
-        const mobileContainer = document.getElementById('google-signin-btn-mobile');
-        if (mobileContainer) {
-          window.google.accounts.id.renderButton(mobileContainer, {
-            theme: 'outline',
-            size: 'medium',
-            shape: 'pill'
-          });
-        }
-      }, 150);
-    }
-  }, [user, mobileOpen]);
+  const handleSignInSubmit = (e) => {
+    e.preventDefault();
+    if (!signInInput.trim()) return;
 
-  const initGoogleSignIn = () => {
-    if (!window.google?.accounts?.id) return;
+    const trimmedInput = signInInput.trim();
+    const isEmail = trimmedInput.includes('@');
+    const name = isEmail ? trimmedInput.split('@')[0] : trimmedInput;
+    const email = isEmail ? trimmedInput : `${trimmedInput.toLowerCase()}@local`;
 
-    const clientId = localStorage.getItem('lexastra_google_client_id') || '1048602693895-placeholder.apps.googleusercontent.com';
+    const profile = {
+      name: name,
+      email: email,
+      picture: '', // Initials are drawn dynamically in JSX
+      token: 'dummy-token-' + Math.random().toString(36).substring(2, 10)
+    };
 
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => {
-        try {
-          const payload = JSON.parse(atob(response.credential.split('.')[1]));
-          const profile = {
-            name: payload.name,
-            email: payload.email,
-            picture: payload.picture,
-            token: response.credential
-          };
-          localStorage.setItem('lexastra_google_user', JSON.stringify(profile));
-          setUser(profile);
-          window.dispatchEvent(new Event('google-signin'));
-        } catch (e) {
-          console.error('Error decoding credential:', e);
-        }
-      }
-    });
-
-    const container = document.getElementById('google-signin-btn');
-    if (container) {
-      window.google.accounts.id.renderButton(container, {
-        theme: 'outline',
-        size: 'medium',
-        shape: 'pill'
-      });
-    }
+    localStorage.setItem('lexastra_google_user', JSON.stringify(profile));
+    setUser(profile);
+    setShowSignInModal(false);
+    setSignInInput('');
+    window.dispatchEvent(new Event('google-signin'));
   };
 
   const handleSignOut = () => {
@@ -162,15 +114,33 @@ export default function Navbar() {
           </li>
           <li style={{ display: 'flex', alignItems: 'center' }}>
             {!user ? (
-              <div id="google-signin-btn" style={{ minHeight: '30px', display: 'flex', alignItems: 'center' }}></div>
+              <button 
+                onClick={() => setShowSignInModal(true)} 
+                className="btn btn--primary btn--small"
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                Sign In
+              </button>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-                <img 
-                  src={user.picture} 
-                  alt={user.name} 
-                  style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid var(--gold)' }} 
+                <div 
+                  style={{ 
+                    width: '28px', 
+                    height: '28px', 
+                    borderRadius: '50%', 
+                    background: '#C9A84C', 
+                    color: '#ffffff', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: '11px', 
+                    fontWeight: 'bold', 
+                    border: '1px solid var(--gold)' 
+                  }} 
                   title={`Logged in as ${user.name} (${user.email})`}
-                />
+                >
+                  {user.name.substring(0, 2).toUpperCase()}
+                </div>
                 <button 
                   onClick={handleSignOut} 
                   className="btn btn--ghost btn--small" 
@@ -216,14 +186,32 @@ export default function Navbar() {
         </Link>
         <div style={{ padding: '12px 0', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'center', width: '100%' }}>
           {!user ? (
-            <div id="google-signin-btn-mobile" style={{ minHeight: '32px' }}></div>
+            <button 
+              onClick={() => { setShowSignInModal(true); setMobileOpen(false); }} 
+              className="btn btn--primary"
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              Sign In
+            </button>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img 
-                src={user.picture} 
-                alt={user.name} 
-                style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--gold)' }} 
-              />
+              <div 
+                style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  borderRadius: '50%', 
+                  background: '#C9A84C', 
+                  color: '#ffffff', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  fontSize: '12px', 
+                  fontWeight: 'bold', 
+                  border: '1px solid var(--gold)' 
+                }} 
+              >
+                {user.name.substring(0, 2).toUpperCase()}
+              </div>
               <span style={{ fontSize: '13px', color: 'var(--navy)' }}>{user.name}</span>
               <button 
                 onClick={() => { handleSignOut(); setMobileOpen(false); }} 
@@ -236,6 +224,91 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {showSignInModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(11, 31, 58, 0.6)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 999999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            background: '#F5F2EB',
+            border: '1px solid #D1C4A5',
+            borderRadius: '16px',
+            padding: '24px 32px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            color: '#0B1F3A',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowSignInModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#666',
+                fontSize: '18px'
+              }}
+            >
+              ✕
+            </button>
+            
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0B1F3A', marginBottom: '8px' }}>
+              Create Local Profile
+            </h3>
+            <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
+              Enter your name or email to sync your textbook highlights, notes, and AI conversations locally.
+            </p>
+            
+            <form onSubmit={handleSignInSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  Name or Email:
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g., Ankes or user@email.com"
+                  value={signInInput}
+                  onChange={(e) => setSignInInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1C4A5',
+                    background: '#ffffff',
+                    color: '#0B1F3A',
+                    outline: 'none'
+                  }}
+                  autoFocus
+                />
+              </div>
+              
+              <button 
+                type="submit" 
+                className="btn btn--gold-fill" 
+                style={{ width: '100%', justifyContent: 'center', padding: '10px', borderRadius: '8px' }}
+              >
+                Create Profile
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
