@@ -6,7 +6,7 @@ export async function POST(req) {
     const { messages, examMode = 'General' } = body;
     
     const customApiKey = req.headers.get('x-api-key');
-    const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
+    const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY || 'sk-b787a477759c4cf58c764b5c843afbbe';
 
     if (!apiKey) {
       return new Response(JSON.stringify({ error: 'API key not configured' }), { 
