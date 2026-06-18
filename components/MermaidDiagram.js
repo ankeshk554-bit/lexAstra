@@ -11,59 +11,52 @@ const sanitizeMermaidChart = (code) => {
   // 1. Remove markdown backticks if they are accidentally included inside the chart string
   sanitized = sanitized.replace(/```mermaid/g, '').replace(/```/g, '');
   
-  // 2. Fix unquoted node labels for different shapes using a combined regex that skips quoted strings:
-  // Group matches:
-  // Group 1, 2: Double rounded brackets ((label)) (circle)
-  // Group 3, 4: Square brackets [label] (square)
-  // Group 5, 6: Single rounded brackets (label) (round)
-  // Group 7, 8: Double curly braces {{label}} (hexagon)
-  // Group 9, 10: Single curly braces {label} (rhombus / decision)
-  const nodeRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\(\(((?:(?!\)\)).)*?)\)\)|([A-Za-z0-9_-]+)\[([^\]\n]*?)\]|([A-Za-z0-9_-]+)\((?!\()((?:(?!\)).)*?)\)(?!\))|([A-Za-z0-9_-]+)\{\{((?:(?!\}\}).)*?)\}\}|([A-Za-z0-9_-]+)\{([^"\}\n]*?)\}/g;
+  // 2. Fix unquoted node labels for different shapes using robust matching:
+  const quotedOrAny = '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"';
   
-  sanitized = sanitized.replace(nodeRegex, (match, g1, g2, g3, g4, g5, g6, g7, g8, g9, g10) => {
-    if (match.startsWith('"')) return match;
-    
-    if (g1) {
-      const id = g1;
-      const label = g2;
-      if (label.startsWith('"') && label.endsWith('"')) return match;
-      const cleanLabel = label.replace(/"/g, '\\"');
-      return `${id}(("${cleanLabel}"))`;
-    }
-    
-    if (g3) {
-      const id = g3;
-      const label = g4;
-      if (label.startsWith('"') && label.endsWith('"')) return match;
-      const cleanLabel = label.replace(/"/g, '\\"');
-      return `${id}["${cleanLabel}"]`;
-    }
-    
-    if (g5) {
-      const id = g5;
-      const label = g6;
-      if (label.startsWith('"') && label.endsWith('"')) return match;
-      const cleanLabel = label.replace(/"/g, '\\"');
-      return `${id}("${cleanLabel}")`;
-    }
-    
-    if (g7) {
-      const id = g7;
-      const label = g8;
-      if (label.startsWith('"') && label.endsWith('"')) return match;
-      const cleanLabel = label.replace(/"/g, '\\"');
-      return `${id}{{"${cleanLabel}"}}`;
-    }
-    
-    if (g9) {
-      const id = g9;
-      const label = g10;
-      if (label.startsWith('"') && label.endsWith('"')) return match;
-      const cleanLabel = label.replace(/"/g, '\\"');
-      return `${id}{"${cleanLabel}"}`;
-    }
-    
-    return match;
+  // Double rounded: ((label))
+  const doubleRoundRegex = new RegExp(`([A-Za-z0-9_-]+)\\(\\(\\s*(${quotedOrAny}|(?:(?!\\)\\)).)*)\\s*\\)\\)`, 'g');
+  sanitized = sanitized.replace(doubleRoundRegex, (match, id, label) => {
+    const trimmed = label.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
+    const cleanLabel = trimmed.replace(/"/g, '\\"');
+    return `${id}(("${cleanLabel}"))`;
+  });
+  
+  // Square: [label]
+  const squareRegex = new RegExp(`([A-Za-z0-9_-]+)\\[\\s*(${quotedOrAny}|[^\\]\\n]*)\\s*\\]`, 'g');
+  sanitized = sanitized.replace(squareRegex, (match, id, label) => {
+    const trimmed = label.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
+    const cleanLabel = trimmed.replace(/"/g, '\\"');
+    return `${id}["${cleanLabel}"]`;
+  });
+  
+  // Single round: (label)
+  const roundRegex = new RegExp(`([A-Za-z0-9_-]+)\\(\\s*(${quotedOrAny}|[^)\\n]*)\\s*\\)`, 'g');
+  sanitized = sanitized.replace(roundRegex, (match, id, label) => {
+    const trimmed = label.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
+    const cleanLabel = trimmed.replace(/"/g, '\\"');
+    return `${id}("${cleanLabel}")`;
+  });
+  
+  // Double curly: {{label}}
+  const doubleCurlyRegex = new RegExp(`([A-Za-z0-9_-]+)\\{\\{\\s*(${quotedOrAny}|(?:(?!\\}\\}\\}).)*)\\s*\\}\\}`, 'g');
+  sanitized = sanitized.replace(doubleCurlyRegex, (match, id, label) => {
+    const trimmed = label.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
+    const cleanLabel = trimmed.replace(/"/g, '\\"');
+    return `${id}{{"${cleanLabel}"}}`;
+  });
+  
+  // Single curly: {label}
+  const curlyRegex = new RegExp(`([A-Za-z0-9_-]+)\\{\\s*(${quotedOrAny}|[^}\\n]*)\\s*\\}`, 'g');
+  sanitized = sanitized.replace(curlyRegex, (match, id, label) => {
+    const trimmed = label.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
+    const cleanLabel = trimmed.replace(/"/g, '\\"');
+    return `${id}{"${cleanLabel}"}`;
   });
   
   // 3. Fix unquoted text in arrow labels, e.g. -->|label|
@@ -77,12 +70,18 @@ const sanitizeMermaidChart = (code) => {
     return `${arrow}|"${cleanLabel}"|`;
   });
   
-  // 4. Fix unquoted text on connections, e.g. A -- text --> B
-  const connRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\s+--\s+([^"\-\n\s>][^\-\n>]*)\s+-->\s+([A-Za-z0-9_-]+)/g;
-  sanitized = sanitized.replace(connRegex, (match, id1, text, id2) => {
-    if (match.startsWith('"')) return match;
-    const cleanText = text.trim().replace(/"/g, '\\"');
-    return `${id1} -->|"${cleanText}"| ${id2}`;
+  // 4. Fix connection labels: A -- Yes --> B or A -- "Yes" --> B with potentially complex node shapes
+  // Node pattern matches simple ID or ID with brackets/parens/braces (quoted or unquoted label)
+  const nodePatternStr = `(?:[A-Za-z0-9_-]+(?:\\(\\(\\s*(?:${quotedOrAny}|(?:(?!\\)\\)).)*)\\s*\\)\\)|\\(\\s*(?:${quotedOrAny}|[^)\\n]*)\\s*\\)|\\[\\s*(?:${quotedOrAny}|[^\\]\\n]*)\\s*\\]|\\{\\{\\s*(?:${quotedOrAny}|(?:(?!\\}\\}\\}).)*)\\s*\\}\\}|\\{\\s*(?:${quotedOrAny}|[^}\\n]*)\\s*\\})?)`;
+  const connRegex = new RegExp(`(${nodePatternStr})\\s+--\\s+((?:"[^"\\n]*")|(?:[^"\\-\\n\\s>][^\\-\\n>]*))\\s+-->\\s+(${nodePatternStr})`, 'g');
+  
+  sanitized = sanitized.replace(connRegex, (match, node1, label, node2) => {
+    let cleanLabel = label.trim();
+    if (cleanLabel.startsWith('"') && cleanLabel.endsWith('"')) {
+      cleanLabel = cleanLabel.substring(1, cleanLabel.length - 1);
+    }
+    const escapedLabel = cleanLabel.replace(/"/g, '\\"');
+    return `${node1} -->|"${escapedLabel}"| ${node2}`;
   });
 
   // 5. Ensure the chart starts with a valid diagram declaration keyword
@@ -115,7 +114,18 @@ export default function MermaidDiagram({ chart }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const id = useId();
   const mermaidId = `mermaid-${id.replace(/:/g, '')}`;
+  const activeRenderIdRef = useRef('');
   const timeoutRef = useRef(null);
+
+  const cleanupLeakedElements = (idToClean) => {
+    if (!idToClean) return;
+    const element = document.getElementById(idToClean);
+    if (element) element.remove();
+    const dElement = document.getElementById(`d${idToClean}`);
+    if (dElement) dElement.remove();
+    const bindPool = document.getElementById(`bind-pool-${idToClean}`);
+    if (bindPool) bindPool.remove();
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -126,6 +136,9 @@ export default function MermaidDiagram({ chart }) {
     
     const initAndRender = async () => {
       if (!chart) return;
+      
+      const renderId = `${mermaidId}-${Math.random().toString(36).substring(2, 9)}`;
+      activeRenderIdRef.current = renderId;
       
       const mermaid = (await import('mermaid')).default;
       
@@ -155,17 +168,11 @@ export default function MermaidDiagram({ chart }) {
       const sanitizedChart = sanitizeMermaidChart(chart);
 
       try {
-        const { svg: generatedSvg } = await mermaid.render(mermaidId, sanitizedChart);
+        const { svg: generatedSvg } = await mermaid.render(renderId, sanitizedChart);
         
         if (isMounted) {
           if (generatedSvg.includes('Syntax error') || generatedSvg.includes('error-icon') || generatedSvg.includes('parser-error')) {
-            // Clean up any leaked mermaid DOM elements from the body
-            const element = document.getElementById(mermaidId);
-            if (element) element.remove();
-            const dElement = document.getElementById(`d${mermaidId}`);
-            if (dElement) dElement.remove();
-            const bindPool = document.getElementById(`bind-pool-${mermaidId}`);
-            if (bindPool) bindPool.remove();
+            cleanupLeakedElements(renderId);
             handleError();
           } else {
             setSvg(generatedSvg);
@@ -174,13 +181,8 @@ export default function MermaidDiagram({ chart }) {
         }
       } catch (err) {
         if (isMounted) {
-          // Clean up any leaked mermaid DOM elements from the body
-          const element = document.getElementById(mermaidId);
-          if (element) element.remove();
-          const dElement = document.getElementById(`d${mermaidId}`);
-          if (dElement) dElement.remove();
-          const bindPool = document.getElementById(`bind-pool-${mermaidId}`);
-          if (bindPool) bindPool.remove();
+          console.error("[MermaidDiagram] Render error:", err, "for chart:", sanitizedChart);
+          cleanupLeakedElements(renderId);
           handleError();
         }
       }
@@ -202,13 +204,7 @@ export default function MermaidDiagram({ chart }) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      // Clean up any leaked elements matching the mermaidId
-      const element = document.getElementById(mermaidId);
-      if (element) element.remove();
-      const dElement = document.getElementById(`d${mermaidId}`);
-      if (dElement) dElement.remove();
-      const bindPool = document.getElementById(`bind-pool-${mermaidId}`);
-      if (bindPool) bindPool.remove();
+      cleanupLeakedElements(activeRenderIdRef.current);
     };
   }, [chart, mermaidId]);
 
