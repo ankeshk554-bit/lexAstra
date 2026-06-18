@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Download, Check, Plus, MessageSquare, Trash2, StopCircle, RefreshCw, PanelLeftOpen, PanelLeftClose, Maximize2, Minimize2 } from 'lucide-react';
@@ -893,6 +894,30 @@ export default function AIAssistantClient() {
                   </button>
                 </div>
               )}
+
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  background: 'rgba(201, 168, 76, 0.06)',
+                  border: '1px solid rgba(201, 168, 76, 0.2)',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                  maxWidth: '550px',
+                  margin: '20px auto',
+                  textAlign: 'left',
+                  fontSize: '13px',
+                  color: 'var(--charcoal-light)'
+                }}
+              >
+                <div style={{ background: 'var(--gold)', color: 'var(--navy)', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 'bold' }}>
+                  📄
+                </div>
+                <div>
+                  <strong>Document Analysis Workspace:</strong> Studying a legal textbook or bare act PDF? Use the <Link href="/pdf-reader" style={{ color: 'var(--gold-dark)', fontWeight: '600', textDecoration: 'underline' }}>PDF Assistant</Link> to highlight text, take notes, and run AI commands.
+                </div>
+              </div>
 
               <div className="chat-chips">
                 {getExamChips(examMode).map(chip => (

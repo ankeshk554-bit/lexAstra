@@ -6,7 +6,8 @@ import {
   Sparkles, Highlighter, Edit3, Trash2, Check, MessageSquare, 
   BookOpen, Search, Copy, List, Maximize2, AlertCircle, FileText,
   Menu, X, Database, Folder, Plus, RefreshCw, Cloud, ArrowLeft,
-  ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2, Download
+  ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2, Download,
+  PanelLeftOpen, PanelLeftClose
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -430,6 +431,7 @@ export default function PDFReaderClient() {
   const [tempNoteText, setTempNoteText] = useState('');
   const [fitMode, setFitMode] = useState('width'); // 'width' | 'page' | 'custom'
   const [activeAnnotationMenu, setActiveAnnotationMenu] = useState(null); // { ann, left, top }
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
   
   // Derived state: unique storage key for annotations
   const pdfKey = fileName ? `lexastra_pdf_${fileName.replace(/\s+/g, '_')}` : '';
@@ -647,6 +649,15 @@ export default function PDFReaderClient() {
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [pdfDocument, recalculateZoom]);
+
+  // Trigger zoom recalculation when panels open or close (after animation transition finishes)
+  useEffect(() => {
+    if (!pdfDocument) return;
+    const timer = setTimeout(() => {
+      recalculateZoom();
+    }, 300); // Wait 300ms for CSS transition to complete
+    return () => clearTimeout(timer);
+  }, [sidebarOpen, chatOpen, bottomPanelOpen, pdfDocument, recalculateZoom]);
 
   const handlePDFSearch = (query) => {
     setPdfSearchQuery(query);
@@ -1160,6 +1171,8 @@ export default function PDFReaderClient() {
   const handleSendChat = async (directText = null, directMode = null, directContextText = null) => {
     const userMessage = (typeof directText === 'string' ? directText : chatInput).trim();
     if (!userMessage || isChatLoading) return;
+
+    setChatOpen(true);
 
     if (typeof directText !== 'string') {
       setChatInput('');
@@ -1724,17 +1737,15 @@ export default function PDFReaderClient() {
             {/* Viewer Toolbar */}
             <header className="pdf-toolbar">
               <div className="pdf-toolbar__group">
-                {/* Auto-hide Menu trigger button */}
-                {!sidebarOpen && (
-                  <button 
-                    className="pdf-toolbar__btn" 
-                    onClick={() => setSidebarOpen(true)}
-                    title="Show Outline & Notes Sidebar"
-                    style={{ marginRight: '8px', color: 'var(--gold)' }}
-                  >
-                    <Menu size={18} />
-                  </button>
-                )}
+                {/* Outline & Notes Sidebar toggle button */}
+                <button 
+                  className={`pdf-toolbar__btn ${sidebarOpen ? 'pdf-toolbar__btn--active' : ''}`}
+                  onClick={() => setSidebarOpen(prev => !prev)}
+                  title={sidebarOpen ? "Hide Outline & Notes Sidebar" : "Show Outline & Notes Sidebar"}
+                  style={{ marginRight: '8px', color: sidebarOpen ? 'var(--gold)' : 'inherit' }}
+                >
+                  {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                </button>
                 
                 <button 
                   onClick={handleCloseActiveBook}
@@ -1827,6 +1838,17 @@ export default function PDFReaderClient() {
                 </button>
                 
                 <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+                
+                {/* Annotations Database Table toggle button */}
+                <button 
+                  className={`pdf-toolbar__btn ${bottomPanelOpen ? 'pdf-toolbar__btn--active' : ''}`}
+                  onClick={() => setBottomPanelOpen(prev => !prev)}
+                  title={bottomPanelOpen ? "Hide Notes & Highlights Table" : "Show Notes & Highlights Table"}
+                  style={{ color: bottomPanelOpen ? 'var(--gold)' : 'inherit', marginRight: '6px' }}
+                >
+                  <Database size={16} />
+                  <span style={{ fontSize: '11px', fontWeight: '500', marginLeft: '4px' }}>Database</span>
+                </button>
                 
                 {/* AI Chat Panel toggle button */}
                 <button 
@@ -2004,6 +2026,138 @@ export default function PDFReaderClient() {
                 </div>
               )}
             </div>
+
+            {/* Structured Annotations & Highlights Table Database Panel */}
+            {bottomPanelOpen && (
+              <div className="pdf-bottom-panel">
+                <header className="pdf-bottom-panel__header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Highlighter size={14} style={{ color: 'var(--gold)' }} />
+                    <span style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Notes & Highlights Database ({annotations.length})
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => setBottomPanelOpen(false)}
+                    className="pdf-annotation-popover__close"
+                    title="Hide Database"
+                  >
+                    <X size={14} />
+                  </button>
+                </header>
+                <div className="pdf-bottom-panel__content">
+                  {annotations.length === 0 ? (
+                    <div className="empty-table-state">
+                      <Edit3 size={24} style={{ opacity: 0.3, marginBottom: '6px', display: 'inline-block' }} />
+                      <p style={{ fontSize: '12px', margin: 0 }}>No saved highlights or study notes. Highlight text in the PDF to populate this table database.</p>
+                    </div>
+                  ) : (
+                    <table className="annotations-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: '80px' }}>Page</th>
+                          <th style={{ width: '130px' }}>Color</th>
+                          <th>Highlighted Statutory Text</th>
+                          <th>Study Notes / Comments (Click to edit)</th>
+                          <th style={{ width: '180px' }}>AI Assist</th>
+                          <th style={{ width: '60px' }}>Delete</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {annotations.map((ann) => (
+                          <tr key={ann.id}>
+                            <td>
+                              <button 
+                                onClick={() => scrollToPage(ann.page)}
+                                className="table-page-link"
+                                title={`Scroll to Page ${ann.page}`}
+                              >
+                                Page {ann.page}
+                              </button>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="color-indicator-dot" style={{ backgroundColor: ann.color }} />
+                                <div className="table-color-picker">
+                                  {['#FEF08A', '#86EFAC', '#93C5FD', '#F9A8D4', '#D8B4FE', '#FDBA74'].map(c => (
+                                    <button 
+                                      key={c}
+                                      onClick={() => handleUpdateAnnotationColor(ann.id, c)}
+                                      className="color-dot-mini"
+                                      style={{ backgroundColor: c, border: ann.color === c ? '1px solid #fff' : 'none' }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="table-quote-cell">
+                              <span title={ann.text}>{ann.text.length > 80 ? ann.text.substring(0, 80) + '...' : ann.text}</span>
+                            </td>
+                            <td className="table-note-cell">
+                              {editingNoteId === ann.id ? (
+                                <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                                  <input 
+                                    type="text" 
+                                    value={tempNoteText} 
+                                    onChange={(e) => setTempNoteText(e.target.value)} 
+                                    style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-gold)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '12px', outline: 'none' }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveNote(ann.id);
+                                    }}
+                                  />
+                                  <button onClick={() => handleSaveNote(ann.id)} className="btn btn--gold-fill btn--small" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                                    Save
+                                  </button>
+                                  <button onClick={() => setEditingNoteId(null)} className="btn btn--ghost btn--small" style={{ padding: '2px 8px', fontSize: '10px' }}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="table-note-content-wrapper" onClick={() => handleStartEditNote(ann)}>
+                                  {ann.comment ? (
+                                    <span className="note-text-display">{ann.comment}</span>
+                                  ) : (
+                                    <span className="note-text-placeholder">+ Click to add note...</span>
+                                  )}
+                                  <Edit3 size={11} className="note-edit-icon" />
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button 
+                                  onClick={() => askAboutHighlight(ann, 'explain')}
+                                  className="btn btn--primary btn--small"
+                                  style={{ fontSize: '10px', padding: '3px 6px', gap: '2px' }}
+                                >
+                                  <BookOpen size={10} /> Explain
+                                </button>
+                                <button 
+                                  onClick={() => askAboutHighlight(ann, 'cases')}
+                                  className="btn btn--ghost btn--small"
+                                  style={{ fontSize: '10px', padding: '3px 6px', gap: '2px' }}
+                                >
+                                  <Search size={10} /> Cases
+                                </button>
+                              </div>
+                            </td>
+                            <td>
+                              <button 
+                                onClick={() => handleDeleteAnnotationConfirmed(ann.id)}
+                                className="table-delete-btn"
+                                title="Delete Highlight & Note"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>

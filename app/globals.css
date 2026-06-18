@@ -4382,3 +4382,230 @@ body.full-screen-page .scroll-progress {
 .popover-delete-btn:hover {
   background: rgba(239, 68, 68, 0.1);
 }
+
+/* ==========================================================================
+   Annotations Bottom Drawer Database Table Styling
+   ========================================================================== */
+.pdf-bottom-panel {
+  height: 290px;
+  background: var(--navy-dark);
+  border-top: 2px solid var(--border-gold);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 9;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.pdf-bottom-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 20px;
+  background: var(--navy);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--parchment);
+  font-family: var(--font-ui);
+}
+
+.pdf-bottom-panel__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+  background: rgba(11, 31, 58, 0.95);
+}
+
+/* Custom scrollbar for bottom panel content */
+.pdf-bottom-panel__content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.pdf-bottom-panel__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pdf-bottom-panel__content::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.25);
+  border-radius: 4px;
+}
+.pdf-bottom-panel__content::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 168, 76, 0.45);
+}
+
+.empty-table-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(245, 240, 232, 0.5);
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* Annotations table database */
+.annotations-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+}
+
+.annotations-table th {
+  position: sticky;
+  top: 0;
+  background: var(--navy);
+  color: var(--gold);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  padding: 10px 14px;
+  border-bottom: 1.5px solid var(--gold);
+  z-index: 1;
+}
+
+.annotations-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(245, 240, 232, 0.9);
+  vertical-align: middle;
+}
+
+.annotations-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.table-page-link {
+  background: rgba(201, 168, 76, 0.12);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  color: var(--gold-light);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.table-page-link:hover {
+  background: var(--gold);
+  color: var(--navy);
+  border-color: var(--gold);
+  box-shadow: 0 0 8px var(--gold-glow);
+}
+
+.color-indicator-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.table-color-picker {
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+tr:hover .table-color-picker {
+  opacity: 1;
+}
+
+.color-dot-mini {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease;
+  border: 1.5px solid transparent;
+}
+
+.color-dot-mini:hover {
+  transform: scale(1.25);
+}
+
+.table-quote-cell {
+  font-family: var(--font-body);
+  font-style: italic;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(245, 240, 232, 0.85);
+}
+
+.table-note-cell {
+  max-width: 350px;
+}
+
+.table-note-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+  width: 100%;
+}
+
+.table-note-content-wrapper:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.note-text-display {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-text-placeholder {
+  flex: 1;
+  color: rgba(245, 240, 232, 0.35);
+  font-style: italic;
+}
+
+.note-edit-icon {
+  opacity: 0;
+  color: var(--gold-light);
+  transition: opacity var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.table-note-content-wrapper:hover .note-edit-icon {
+  opacity: 0.7;
+}
+
+.table-delete-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.table-delete-btn:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
