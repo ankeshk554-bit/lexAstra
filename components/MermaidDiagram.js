@@ -3,6 +3,66 @@
 import React, { useEffect, useState, useId, useRef } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, X } from 'lucide-react';
 
+const sanitizeMermaidChart = (code) => {
+  if (!code) return '';
+  
+  let sanitized = code;
+  
+  // 1. Remove markdown backticks if they are accidentally included inside the chart string
+  sanitized = sanitized.replace(/```mermaid/g, '').replace(/```/g, '');
+  
+  // 2. Fix unquoted node labels for different shapes using a combined regex that skips quoted strings:
+  const nodeRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\(\(((?:(?!\)\)).)*?)\)\)|([A-Za-z0-9_-]+)\[([^\]\n]*?)\]|([A-Za-z0-9_-]+)\((?!\()((?:(?!\)).)*?)\)(?!\))|([A-Za-z0-9_-]+)\{([^"\}\n]*?)\}/g;
+  
+  sanitized = sanitized.replace(nodeRegex, (match, g1, g2, g3, g4, g5, g6, g7, g8) => {
+    if (match.startsWith('"')) return match;
+    
+    if (g1) {
+      const id = g1;
+      const label = g2;
+      if (label.startsWith('"') && label.endsWith('"')) return match;
+      const cleanLabel = label.replace(/"/g, '\\"');
+      return `${id}(("${cleanLabel}"))`;
+    }
+    
+    if (g3) {
+      const id = g3;
+      const label = g4;
+      if (label.startsWith('"') && label.endsWith('"')) return match;
+      const cleanLabel = label.replace(/"/g, '\\"');
+      return `${id}["${cleanLabel}"]`;
+    }
+    
+    if (g5) {
+      const id = g5;
+      const label = g6;
+      if (label.startsWith('"') && label.endsWith('"')) return match;
+      const cleanLabel = label.replace(/"/g, '\\"');
+      return `${id}("${cleanLabel}")`;
+    }
+    
+    if (g7) {
+      const id = g7;
+      const label = g8;
+      if (label.startsWith('"') && label.endsWith('"')) return match;
+      const cleanLabel = label.replace(/"/g, '\\"');
+      return `${id}{"${cleanLabel}"}`;
+    }
+    
+    return match;
+  });
+  
+  // 3. Fix unquoted text on connections, e.g. A -- text --> B
+  const connRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\s+--\s+([^"\-\n\s>][^\-\n>]*)\s+-->\s+([A-Za-z0-9_-]+)/g;
+  sanitized = sanitized.replace(connRegex, (match, id1, text, id2) => {
+    if (match.startsWith('"')) return match;
+    const cleanText = text.trim().replace(/"/g, '\\"');
+    return `${id1} -->|"${cleanText}"| ${id2}`;
+  });
+
+  return sanitized;
+};
+
 export default function MermaidDiagram({ chart }) {
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
@@ -10,11 +70,18 @@ export default function MermaidDiagram({ chart }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const id = useId();
   const mermaidId = `mermaid-${id.replace(/:/g, '')}`;
+  const timeoutRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
     
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
     const initAndRender = async () => {
+      if (!chart) return;
+      
       const mermaid = (await import('mermaid')).default;
       
       mermaid.initialize({
@@ -39,23 +106,43 @@ export default function MermaidDiagram({ chart }) {
         }
       });
 
+      const sanitizedChart = sanitizeMermaidChart(chart);
+
       try {
-        if (!chart) return;
-        const { svg: generatedSvg } = await mermaid.render(mermaidId, chart);
+        const { svg: generatedSvg } = await mermaid.render(mermaidId, sanitizedChart);
+        
         if (isMounted) {
-          setSvg(generatedSvg);
-          setError('');
+          if (generatedSvg.includes('Syntax error') || generatedSvg.includes('error-icon') || generatedSvg.includes('parser-error')) {
+            handleError();
+          } else {
+            setSvg(generatedSvg);
+            setError('');
+          }
         }
       } catch (err) {
-        // Silently swallow errors because during AI streaming, the Mermaid syntax 
-        // is naturally incomplete character-by-character, which constantly throws syntax errors.
-        if (isMounted) setError('Generating legal diagram...');
+        if (isMounted) {
+          handleError();
+        }
       }
+    };
+
+    const handleError = () => {
+      setError('Generating legal diagram...');
+      timeoutRef.current = setTimeout(() => {
+        if (isMounted) {
+          setError('Flowchart syntax is incomplete or invalid. Please ask the AI to redraw or simplify the flowchart.');
+        }
+      }, 4000);
     };
 
     initAndRender();
     
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [chart, mermaidId]);
 
   const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3.0));
@@ -123,7 +210,53 @@ export default function MermaidDiagram({ chart }) {
   };
 
   if (error) {
-    return <div style={{ color: 'var(--alert-red)', padding: '8px', border: '1px solid var(--alert-red)', borderRadius: '4px', fontSize: '12px' }}>{error}</div>;
+    if (error === 'Generating legal diagram...') {
+      return (
+        <div style={{
+          border: '1px dashed rgba(201, 168, 76, 0.3)',
+          borderRadius: '12px',
+          padding: '24px',
+          textAlign: 'center',
+          background: 'rgba(201, 168, 76, 0.02)',
+          color: '#C9A84C',
+          margin: '20px 0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
+          <div className="mermaid-pulse-loader" style={{
+            width: '24px',
+            height: '24px',
+            border: '2px solid rgba(201, 168, 76, 0.2)',
+            borderTopColor: '#C9A84C',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+          }} />
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+          <span style={{ fontSize: '13px', fontWeight: '500' }}>Visualizing legal flowchart...</span>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ 
+        color: 'var(--alert-red)', 
+        padding: '12px 16px', 
+        border: '1px solid rgba(239, 68, 68, 0.2)', 
+        borderRadius: '8px', 
+        fontSize: '13px',
+        background: 'rgba(239, 68, 68, 0.02)',
+        margin: '20px 0'
+      }}>
+        ⚠️ {error}
+      </div>
+    );
   }
 
   const cardStyle = {
