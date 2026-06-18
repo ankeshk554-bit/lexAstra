@@ -12,9 +12,15 @@ const sanitizeMermaidChart = (code) => {
   sanitized = sanitized.replace(/```mermaid/g, '').replace(/```/g, '');
   
   // 2. Fix unquoted node labels for different shapes using a combined regex that skips quoted strings:
-  const nodeRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\(\(((?:(?!\)\)).)*?)\)\)|([A-Za-z0-9_-]+)\[([^\]\n]*?)\]|([A-Za-z0-9_-]+)\((?!\()((?:(?!\)).)*?)\)(?!\))|([A-Za-z0-9_-]+)\{([^"\}\n]*?)\}/g;
+  // Group matches:
+  // Group 1, 2: Double rounded brackets ((label)) (circle)
+  // Group 3, 4: Square brackets [label] (square)
+  // Group 5, 6: Single rounded brackets (label) (round)
+  // Group 7, 8: Double curly braces {{label}} (hexagon)
+  // Group 9, 10: Single curly braces {label} (rhombus / decision)
+  const nodeRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\(\(((?:(?!\)\)).)*?)\)\)|([A-Za-z0-9_-]+)\[([^\]\n]*?)\]|([A-Za-z0-9_-]+)\((?!\()((?:(?!\)).)*?)\)(?!\))|([A-Za-z0-9_-]+)\{\{((?:(?!\}\}).)*?)\}\}|([A-Za-z0-9_-]+)\{([^"\}\n]*?)\}/g;
   
-  sanitized = sanitized.replace(nodeRegex, (match, g1, g2, g3, g4, g5, g6, g7, g8) => {
+  sanitized = sanitized.replace(nodeRegex, (match, g1, g2, g3, g4, g5, g6, g7, g8, g9, g10) => {
     if (match.startsWith('"')) return match;
     
     if (g1) {
@@ -46,19 +52,58 @@ const sanitizeMermaidChart = (code) => {
       const label = g8;
       if (label.startsWith('"') && label.endsWith('"')) return match;
       const cleanLabel = label.replace(/"/g, '\\"');
+      return `${id}{{"${cleanLabel}"}}`;
+    }
+    
+    if (g9) {
+      const id = g9;
+      const label = g10;
+      if (label.startsWith('"') && label.endsWith('"')) return match;
+      const cleanLabel = label.replace(/"/g, '\\"');
       return `${id}{"${cleanLabel}"}`;
     }
     
     return match;
   });
   
-  // 3. Fix unquoted text on connections, e.g. A -- text --> B
+  // 3. Fix unquoted text in arrow labels, e.g. -->|label|
+  const arrowLabelRegex = /(-->|-.->|==>)\s*\|([^|\n]+)\|/g;
+  sanitized = sanitized.replace(arrowLabelRegex, (match, arrow, label) => {
+    const trimmed = label.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      return match;
+    }
+    const cleanLabel = trimmed.replace(/"/g, '\\"');
+    return `${arrow}|"${cleanLabel}"|`;
+  });
+  
+  // 4. Fix unquoted text on connections, e.g. A -- text --> B
   const connRegex = /"[^"\n]*"|([A-Za-z0-9_-]+)\s+--\s+([^"\-\n\s>][^\-\n>]*)\s+-->\s+([A-Za-z0-9_-]+)/g;
   sanitized = sanitized.replace(connRegex, (match, id1, text, id2) => {
     if (match.startsWith('"')) return match;
     const cleanText = text.trim().replace(/"/g, '\\"');
     return `${id1} -->|"${cleanText}"| ${id2}`;
   });
+
+  // 5. Ensure the chart starts with a valid diagram declaration keyword
+  const lines = sanitized.split('\n');
+  const firstLineIndex = lines.findIndex(line => line.trim().length > 0);
+  
+  if (firstLineIndex !== -1) {
+    const firstLine = lines[firstLineIndex].trim().toLowerCase();
+    const validKeywords = [
+      'flowchart', 'graph', 'sequencediagram', 'gantt', 'classdiagram', 
+      'statediagram', 'erdiagram', 'journey', 'gitgraph', 'pie', 
+      'mindmap', 'timeline', 'kanban', 'architecture', 'sankey'
+    ];
+    
+    const startsWithKeyword = validKeywords.some(keyword => firstLine.startsWith(keyword));
+    if (!startsWithKeyword) {
+      sanitized = "flowchart TD\n" + sanitized;
+    }
+  } else {
+    sanitized = "flowchart TD\n" + sanitized;
+  }
 
   return sanitized;
 };
@@ -86,6 +131,7 @@ export default function MermaidDiagram({ chart }) {
       
       mermaid.initialize({
         startOnLoad: false,
+        suppressErrorRendering: true,
         theme: 'base',
         themeVariables: {
           primaryColor: '#0B1F3A',
@@ -113,6 +159,13 @@ export default function MermaidDiagram({ chart }) {
         
         if (isMounted) {
           if (generatedSvg.includes('Syntax error') || generatedSvg.includes('error-icon') || generatedSvg.includes('parser-error')) {
+            // Clean up any leaked mermaid DOM elements from the body
+            const element = document.getElementById(mermaidId);
+            if (element) element.remove();
+            const dElement = document.getElementById(`d${mermaidId}`);
+            if (dElement) dElement.remove();
+            const bindPool = document.getElementById(`bind-pool-${mermaidId}`);
+            if (bindPool) bindPool.remove();
             handleError();
           } else {
             setSvg(generatedSvg);
@@ -121,6 +174,13 @@ export default function MermaidDiagram({ chart }) {
         }
       } catch (err) {
         if (isMounted) {
+          // Clean up any leaked mermaid DOM elements from the body
+          const element = document.getElementById(mermaidId);
+          if (element) element.remove();
+          const dElement = document.getElementById(`d${mermaidId}`);
+          if (dElement) dElement.remove();
+          const bindPool = document.getElementById(`bind-pool-${mermaidId}`);
+          if (bindPool) bindPool.remove();
           handleError();
         }
       }
@@ -142,6 +202,13 @@ export default function MermaidDiagram({ chart }) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      // Clean up any leaked elements matching the mermaidId
+      const element = document.getElementById(mermaidId);
+      if (element) element.remove();
+      const dElement = document.getElementById(`d${mermaidId}`);
+      if (dElement) dElement.remove();
+      const bindPool = document.getElementById(`bind-pool-${mermaidId}`);
+      if (bindPool) bindPool.remove();
     };
   }, [chart, mermaidId]);
 
