@@ -145,6 +145,7 @@ export default function MermaidDiagram({ chart }) {
       mermaid.initialize({
         startOnLoad: false,
         suppressErrorRendering: true,
+        securityLevel: 'loose',
         theme: 'base',
         themeVariables: {
           primaryColor: '#0B1F3A',
