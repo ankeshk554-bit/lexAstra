@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Download, Check, Plus, MessageSquare, Trash2, StopCircle, RefreshCw } from 'lucide-react';
+import { Copy, Download, Check, Plus, MessageSquare, Trash2, StopCircle, RefreshCw, PanelLeftOpen, PanelLeftClose, Maximize2, Minimize2 } from 'lucide-react';
 import MermaidDiagram from '@/components/MermaidDiagram';
 
 // Utility to generate a simple UUID
@@ -209,6 +209,25 @@ export default function AIAssistantClient() {
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [googleUser, setGoogleUser] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isWideMode, setIsWideMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lexastra_chat_widemode') === 'true';
+    }
+    return false;
+  });
+
+  // Keyboard shortcut listener to toggle sidebar (Ctrl + B or Ctrl + \)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey && e.key === '\\') || (e.ctrlKey && e.key === 'b') || (e.ctrlKey && e.key === 'B')) {
+        e.preventDefault();
+        setIsSidebarCollapsed(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -622,9 +641,9 @@ export default function AIAssistantClient() {
   }
 
   return (
-    <div className="chat-layout page-enter">
+    <div className={`chat-layout page-enter ${isSidebarCollapsed ? 'chat-layout--sidebar-collapsed' : ''}`}>
       {/* Sidebar History */}
-      <aside className="chat-sidebar">
+      <aside className={`chat-sidebar ${isSidebarCollapsed ? 'chat-sidebar--collapsed' : ''}`}>
         <div className="chat-sidebar__header">
           <h3 className="chat-sidebar__title">LexAstra AI</h3>
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
@@ -706,37 +725,66 @@ export default function AIAssistantClient() {
       </aside>
 
       {/* Main Chat Area */}
-      <main className="chat-main">
-        <div className="chat-disclaimer">
-          LexAstra AI is for educational purposes only. Always verify with primary legal sources.
-        </div>
-
-        <div className="exam-selector-strip">
-          <div className="exam-selector-strip__left">
-            <span className="exam-mode-badge" data-exam={examMode}>
-              🎯 {examMode === 'General' ? 'General Law' : examMode}
-            </span>
-            <span className="exam-selector-strip__tagline">
-              {getExamTagline(examMode)}
-            </span>
+      <main className={`chat-main ${isWideMode ? 'chat-main--wide' : ''}`}>
+        {/* Workspace Control Header */}
+        <div className="chat-header">
+          <div className="chat-header__left">
+            <button 
+              className="chat-sidebar-toggle-btn" 
+              onClick={() => setIsSidebarCollapsed(prev => !prev)}
+              title={isSidebarCollapsed ? "Show Sidebar (Ctrl+B)" : "Hide Sidebar (Ctrl+B)"}
+              aria-label="Toggle Sidebar"
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+            <h1 className="chat-header__title">AI Legal Workspace</h1>
           </div>
-          <select 
-            value={examMode} 
-            onChange={handleExamModeChange}
-            className="exam-selector-dropdown"
-          >
-            <option value="General">General Law</option>
-            <option value="Judiciary">State Judiciary (Civil Judge)</option>
-            <option value="CLAT PG">CLAT PG (LLM)</option>
-            <option value="CLAT UG">CLAT UG (LLB)</option>
-            <option value="AIBE">AIBE (Bar Exam)</option>
-            <option value="APO">APO / APP (Prosecution)</option>
-            <option value="UGC NET Law">UGC NET Law</option>
-            <option value="CUET PG Law">CUET PG Law</option>
-            <option value="SEBI Legal">SEBI Legal Officer</option>
-            <option value="UPSC Law Optional">UPSC Law Optional</option>
-            <option value="IBPS SO Law">IBPS SO Law Officer</option>
-          </select>
+
+          <div className="chat-header__actions">
+            {/* Exam Mode Dropdown */}
+            <div className="chat-header__exam-selector">
+              <span className="exam-mode-badge" data-exam={examMode}>
+                🎯 {examMode === 'General' ? 'General Law' : examMode}
+              </span>
+              <select 
+                value={examMode} 
+                onChange={handleExamModeChange}
+                className="exam-selector-dropdown"
+                aria-label="Select Exam Mode"
+              >
+                <option value="General">General Law</option>
+                <option value="Judiciary">State Judiciary (Civil Judge)</option>
+                <option value="CLAT PG">CLAT PG (LLM)</option>
+                <option value="CLAT UG">CLAT UG (LLB)</option>
+                <option value="AIBE">AIBE (Bar Exam)</option>
+                <option value="APO">APO / APP (Prosecution)</option>
+                <option value="UGC NET Law">UGC NET Law</option>
+                <option value="CUET PG Law">CUET PG Law</option>
+                <option value="SEBI Legal">SEBI Legal Officer</option>
+                <option value="UPSC Law Optional">UPSC Law Optional</option>
+                <option value="IBPS SO Law">IBPS SO Law Officer</option>
+              </select>
+            </div>
+
+            <div className="chat-header__divider" />
+
+            {/* Layout Wide Mode Toggle */}
+            <button 
+              className={`chat-header__layout-btn ${isWideMode ? 'chat-header__layout-btn--active' : ''}`}
+              onClick={() => {
+                setIsWideMode(prev => {
+                  const newVal = !prev;
+                  localStorage.setItem('lexastra_chat_widemode', String(newVal));
+                  return newVal;
+                });
+              }}
+              title={isWideMode ? "Switch to Standard layout (800px)" : "Switch to Wide layout (1300px)"}
+              aria-label="Toggle Wide Mode"
+            >
+              {isWideMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              <span>{isWideMode ? "Standard" : "Wide View"}</span>
+            </button>
+          </div>
         </div>
 
         <div className="chat-messages" ref={chatContainerRef} onScroll={handleScroll}>

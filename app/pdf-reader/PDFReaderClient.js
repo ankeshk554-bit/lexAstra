@@ -356,7 +356,13 @@ export default function PDFReaderClient() {
   // Collapsible Sidebar & Resizable AI Panel (Hide by default on document load)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(400); // Default width: 400px
+  const [chatOpen, setChatOpen] = useState(true);
   const isResizing = useRef(false);
+
+  // Search inside PDF States
+  const [pdfSearchQuery, setPdfSearchQuery] = useState('');
+  const [pdfSearchResults, setPdfSearchResults] = useState([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
 
   // Library Manager States
   const [libraryBooks, setLibraryBooks] = useState([]);
@@ -583,6 +589,51 @@ export default function PDFReaderClient() {
       setZoom(Math.round(newZoom * 100) / 100);
     }).catch(e => console.error(e));
   }, [pdfDocument, currentPage]);
+
+  const handlePDFSearch = (query) => {
+    setPdfSearchQuery(query);
+    if (!query.trim() || pageTexts.length === 0) {
+      setPdfSearchResults([]);
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    const matches = [];
+    const queryLower = query.toLowerCase();
+    
+    pageTexts.forEach(pt => {
+      if (pt.text.toLowerCase().includes(queryLower)) {
+        matches.push(pt.pageNumber);
+      }
+    });
+
+    setPdfSearchResults(matches);
+    setCurrentMatchIndex(0);
+    
+    if (matches.length > 0) {
+      scrollToPage(matches[0]);
+    }
+  };
+
+  const handleNextSearchMatch = () => {
+    if (pdfSearchResults.length === 0) return;
+    const nextIndex = (currentMatchIndex + 1) % pdfSearchResults.length;
+    setCurrentMatchIndex(nextIndex);
+    scrollToPage(pdfSearchResults[nextIndex]);
+  };
+
+  const handlePrevSearchMatch = () => {
+    if (pdfSearchResults.length === 0) return;
+    const prevIndex = (currentMatchIndex - 1 + pdfSearchResults.length) % pdfSearchResults.length;
+    setCurrentMatchIndex(prevIndex);
+    scrollToPage(pdfSearchResults[prevIndex]);
+  };
+
+  const handleClearPDFSearch = () => {
+    setPdfSearchQuery('');
+    setPdfSearchResults([]);
+    setCurrentMatchIndex(0);
+  };
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -1252,7 +1303,7 @@ export default function PDFReaderClient() {
   }
 
   return (
-    <div className="pdf-layout page-enter">
+    <div className={`pdf-layout page-enter ${!chatOpen ? 'pdf-layout--chat-collapsed' : ''}`}>
       {/* 1. Collapsible Outline & Annotations Panel */}
       <aside className={`pdf-sidebar ${sidebarOpen ? '' : 'collapsed'}`}>
         <div className="pdf-sidebar__header-wrapper">
@@ -1613,7 +1664,42 @@ export default function PDFReaderClient() {
                 </button>
               </div>
 
-              <div className="pdf-toolbar__group">
+              {/* In-Document PDF Text Search Group */}
+              <div className="pdf-toolbar__group pdf-toolbar__search-group">
+                <div className="pdf-search-input-wrapper">
+                  <Search size={14} className="pdf-search-icon" />
+                  <input 
+                    type="text" 
+                    placeholder="Search in PDF..." 
+                    value={pdfSearchQuery}
+                    onChange={(e) => handlePDFSearch(e.target.value)}
+                    disabled={!pdfDocument || isIndexing}
+                  />
+                  {pdfSearchQuery && (
+                    <button onClick={handleClearPDFSearch} className="pdf-search-clear" title="Clear Search">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+                {pdfSearchResults.length > 0 && (
+                  <div className="pdf-search-nav">
+                    <span className="pdf-search-count">
+                      {currentMatchIndex + 1} of {pdfSearchResults.length}
+                    </span>
+                    <button onClick={handlePrevSearchMatch} className="pdf-search-nav-btn" title="Previous Match">
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button onClick={handleNextSearchMatch} className="pdf-search-nav-btn" title="Next Match">
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+                {pdfSearchQuery && pdfSearchResults.length === 0 && !isIndexing && (
+                  <span className="pdf-search-no-results">No matches</span>
+                )}
+              </div>
+
+              <div className="pdf-toolbar__group" style={{ marginLeft: 'auto' }}>
                 <button className="pdf-toolbar__btn" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
                   <ZoomOut size={16} />
                 </button>
@@ -1632,6 +1718,19 @@ export default function PDFReaderClient() {
                 <button className="pdf-toolbar__btn" onClick={handleFitPage} title="Fit Entire Page" style={{ display: 'flex', gap: '4px', padding: '4px 8px' }}>
                   <Minimize2 size={13} />
                   <span style={{ fontSize: '11px', fontWeight: '500' }}>Fit Page</span>
+                </button>
+                
+                <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+                
+                {/* AI Chat Panel toggle button */}
+                <button 
+                  className={`pdf-toolbar__btn ${chatOpen ? 'pdf-toolbar__btn--active' : ''}`}
+                  onClick={() => setChatOpen(prev => !prev)}
+                  title={chatOpen ? "Hide AI Assistant Panel" : "Show AI Assistant Panel"}
+                  style={{ color: chatOpen ? 'var(--gold)' : 'inherit' }}
+                >
+                  <Sparkles size={16} />
+                  <span style={{ fontSize: '11px', fontWeight: '500', marginLeft: '4px' }}>AI Chat</span>
                 </button>
               </div>
             </header>
@@ -1699,7 +1798,7 @@ export default function PDFReaderClient() {
       {/* 3. Panel Resize Handle */}
       {pdfDocument && (
         <div 
-          className="pdf-resize-handle"
+          className={`pdf-resize-handle ${!chatOpen ? 'pdf-resize-handle--collapsed' : ''}`}
           onMouseDown={startResizing}
           title="Drag to resize AI assistant window"
         />
@@ -1707,7 +1806,7 @@ export default function PDFReaderClient() {
 
       {/* 4. Right AI Assistant Panel */}
       {pdfDocument && (
-        <section className="pdf-chat-panel" style={{ width: `${chatWidth}px` }}>
+        <section className={`pdf-chat-panel ${!chatOpen ? 'pdf-chat-panel--collapsed' : ''}`} style={{ width: `${chatWidth}px` }}>
           <header className="pdf-chat-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={16} style={{ color: 'var(--gold)' }} />
