@@ -164,12 +164,38 @@ const PDFPage = memo(({
     return annotations.filter((ann) => ann.page === pageNumber);
   }, [annotations, pageNumber]);
 
+  const handlePageClick = (e) => {
+    // If the user has a text selection active, do not open highlight popover
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) return;
+
+    if (!pageContainerRef.current) return;
+    const rect = pageContainerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
+
+    // Find if click lands inside any highlight box
+    const clickedAnn = pageAnnotations.find(ann => {
+      return ann.rects.some(r => {
+        // Add 2px padding for easier click targeting
+        return x >= (r.left - 2) && x <= (r.left + r.width + 2) &&
+               y >= (r.top - 2) && y <= (r.top + r.height + 2);
+      });
+    });
+
+    if (clickedAnn) {
+      e.stopPropagation();
+      onHighlightClick(clickedAnn, e);
+    }
+  };
+
   return (
     <div
       id={`pdf-page-${pageNumber}`}
       ref={pageContainerRef}
       className="pdf-page-container"
       data-page={pageNumber}
+      onClick={handlePageClick}
       style={{
         position: 'relative',
         width: `${width}px`,
@@ -189,10 +215,6 @@ const PDFPage = memo(({
               <div
                 key={`${ann.id}-${idx}`}
                 className="highlight-rect"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onHighlightClick(ann, e);
-                }}
                 style={{
                   position: 'absolute',
                   backgroundColor: ann.color,
@@ -200,12 +222,10 @@ const PDFPage = memo(({
                   top: `${rect.top * zoom}px`,
                   width: `${rect.width * zoom}px`,
                   height: `${rect.height * zoom}px`,
-                  pointerEvents: 'auto',
-                  cursor: 'pointer',
+                  pointerEvents: 'none', // Revert to none so text selection is 100% fluent
                   mixBlendMode: 'multiply',
                   borderRadius: '3px',
-                  opacity: 0.85,
-                  transition: 'opacity 0.2s'
+                  opacity: 0.85
                 }}
               />
             ))
