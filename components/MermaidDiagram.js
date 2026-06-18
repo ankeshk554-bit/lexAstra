@@ -140,41 +140,42 @@ export default function MermaidDiagram({ chart }) {
       const renderId = `${mermaidId}-${Math.random().toString(36).substring(2, 9)}`;
       activeRenderIdRef.current = renderId;
       
-      const mermaid = (await import('mermaid')).default;
-      
-      mermaid.initialize({
-        startOnLoad: false,
-        suppressErrorRendering: true,
-        securityLevel: 'loose',
-        theme: 'base',
-        themeVariables: {
-          primaryColor: '#0B1F3A',
-          primaryBorderColor: '#C9A84C',
-          lineColor: '#C9A84C',
-          secondaryColor: '#173A6B',
-          tertiaryColor: '#0B1F3A',
-          edgeLabelBackground: '#0B1F3A', // Navy background for edge labels so the native white text contrasts perfectly
-          primaryTextColor: '#ffffff',
-          nodeTextColor: '#ffffff',
-          textColor: '#ffffff',
-          mainBkg: '#0B1F3A',
-          nodeBorder: '#C9A84C',
-        },
-        flowchart: {
-          htmlLabels: true,
-          useMaxWidth: true,
-        }
-      });
-
-      const sanitizedChart = sanitizeMermaidChart(chart);
-
       try {
+        const mermaidModule = await import('mermaid');
+        const mermaid = mermaidModule.default || mermaidModule;
+        
+        mermaid.initialize({
+          startOnLoad: false,
+          suppressErrorRendering: true,
+          securityLevel: 'loose',
+          theme: 'base',
+          themeVariables: {
+            primaryColor: '#0B1F3A',
+            primaryBorderColor: '#C9A84C',
+            lineColor: '#C9A84C',
+            secondaryColor: '#173A6B',
+            tertiaryColor: '#0B1F3A',
+            edgeLabelBackground: '#0B1F3A', // Navy background for edge labels so the native white text contrasts perfectly
+            primaryTextColor: '#ffffff',
+            nodeTextColor: '#ffffff',
+            textColor: '#ffffff',
+            mainBkg: '#0B1F3A',
+            nodeBorder: '#C9A84C',
+          },
+          flowchart: {
+            htmlLabels: true,
+            useMaxWidth: true,
+          }
+        });
+
+        const sanitizedChart = sanitizeMermaidChart(chart);
+
         const { svg: generatedSvg } = await mermaid.render(renderId, sanitizedChart);
         
         if (isMounted) {
           if (generatedSvg.includes('Syntax error') || generatedSvg.includes('error-icon') || generatedSvg.includes('parser-error')) {
             cleanupLeakedElements(renderId);
-            handleError();
+            handleError(new Error("Syntax error detected in generated SVG"));
           } else {
             setSvg(generatedSvg);
             setError('');
@@ -182,18 +183,19 @@ export default function MermaidDiagram({ chart }) {
         }
       } catch (err) {
         if (isMounted) {
-          console.error("[MermaidDiagram] Render error:", err, "for chart:", sanitizedChart);
+          console.error("[MermaidDiagram] Render error:", err, "for chart:", chart);
           cleanupLeakedElements(renderId);
-          handleError();
+          handleError(err);
         }
       }
     };
 
-    const handleError = () => {
+    const handleError = (err) => {
       setError('Generating legal diagram...');
       timeoutRef.current = setTimeout(() => {
         if (isMounted) {
-          setError('Flowchart syntax is incomplete or invalid. Please ask the AI to redraw or simplify the flowchart.');
+          const detail = err ? `\nDetail: ${err.message || err.toString()}` : '';
+          setError(`Flowchart syntax is incomplete or invalid. Please ask the AI to redraw or simplify the flowchart.${detail}`);
         }
       }, 4000);
     };
