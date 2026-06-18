@@ -177,11 +177,13 @@ const PDFPage = memo(({
     // Find if click lands inside any highlight box
     const clickedAnn = pageAnnotations.find(ann => {
       return ann.rects.some(r => {
-        // Add 2px padding for easier click targeting
-        return x >= (r.left - 2) && x <= (r.left + r.width + 2) &&
-               y >= (r.top - 2) && y <= (r.top + r.height + 2);
+        // Add 3px padding for easier click targeting
+        return x >= (r.left - 3) && x <= (r.left + r.width + 3) &&
+               y >= (r.top - 3) && y <= (r.top + r.height + 3);
       });
     });
+
+    console.log(`[PDFPage] Click on page ${pageNumber} at coordinates: x=${x.toFixed(1)}, y=${y.toFixed(1)} (normalized). Found highlight?`, clickedAnn ? "Yes" : "No");
 
     if (clickedAnn) {
       e.stopPropagation();
@@ -208,8 +210,8 @@ const PDFPage = memo(({
     >
       {isVisible ? (
         <>
-          <canvas ref={canvasRef} style={{ display: 'block' }} />
-          <div className="textLayer" ref={textLayerRef} />
+          <canvas ref={canvasRef} style={{ display: 'block', position: 'relative', zIndex: 1 }} />
+          <div className="textLayer" ref={textLayerRef} style={{ zIndex: 3 }} />
           {pageAnnotations.map((ann) =>
             ann.rects.map((rect, idx) => (
               <div
@@ -225,7 +227,8 @@ const PDFPage = memo(({
                   pointerEvents: 'none', // Revert to none so text selection is 100% fluent
                   mixBlendMode: 'multiply',
                   borderRadius: '3px',
-                  opacity: 0.85
+                  opacity: 0.85,
+                  zIndex: 2 // Positioned between Canvas (zIndex 1) and textLayer (zIndex 3)
                 }}
               />
             ))
@@ -988,6 +991,8 @@ export default function PDFReaderClient() {
     
     const left = e.clientX - containerRect.left;
     const top = e.clientY - containerRect.top + containerRef.current.scrollTop - 10;
+    
+    console.log(`[PDFReaderClient] Opening highlight popover menu for annotation ID: ${ann.id} on page ${ann.page} at relative left: ${left.toFixed(1)}, top: ${top.toFixed(1)}`);
     
     // Always query the latest annotation data from current state array
     setAnnotations(currentAnns => {
