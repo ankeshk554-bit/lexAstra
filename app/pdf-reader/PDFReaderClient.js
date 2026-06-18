@@ -6,7 +6,7 @@ import {
   Sparkles, Highlighter, Edit3, Trash2, Check, MessageSquare, 
   BookOpen, Search, Copy, List, Maximize2, AlertCircle, FileText,
   Menu, X, Database, Folder, Plus, RefreshCw, Cloud, ArrowLeft,
-  ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2
+  ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2, Download
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -20,7 +20,8 @@ const PDFPage = memo(({
   zoom,
   annotations,
   onPageVisible,
-  rootRef
+  rootRef,
+  onHighlightClick
 }) => {
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
@@ -188,6 +189,10 @@ const PDFPage = memo(({
               <div
                 key={`${ann.id}-${idx}`}
                 className="highlight-rect"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onHighlightClick(ann, e);
+                }}
                 style={{
                   position: 'absolute',
                   backgroundColor: ann.color,
@@ -195,10 +200,12 @@ const PDFPage = memo(({
                   top: `${rect.top * zoom}px`,
                   width: `${rect.width * zoom}px`,
                   height: `${rect.height * zoom}px`,
-                  pointerEvents: 'none',
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
                   mixBlendMode: 'multiply',
                   borderRadius: '3px',
-                  opacity: 0.85
+                  opacity: 0.85,
+                  transition: 'opacity 0.2s'
                 }}
               />
             ))
@@ -227,6 +234,7 @@ const PDFPage = memo(({
   if (prevProps.zoom !== nextProps.zoom) return false;
   if (prevProps.pdfDocument !== nextProps.pdfDocument) return false;
   if (prevProps.rootRef !== nextProps.rootRef) return false;
+  if (prevProps.onHighlightClick !== nextProps.onHighlightClick) return false;
   
   const prevAnns = prevProps.annotations.filter(a => a.page === prevProps.pageNumber);
   const nextAnns = nextProps.annotations.filter(a => a.page === nextProps.pageNumber);
@@ -397,6 +405,8 @@ export default function PDFReaderClient() {
   const [activeTab, setActiveTab] = useState('annotations'); // 'outline' | 'annotations'
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [tempNoteText, setTempNoteText] = useState('');
+  const [fitMode, setFitMode] = useState('width'); // 'width' | 'page' | 'custom'
+  const [activeAnnotationMenu, setActiveAnnotationMenu] = useState(null); // { ann, left, top }
   
   // Derived state: unique storage key for annotations
   const pdfKey = fileName ? `lexastra_pdf_${fileName.replace(/\s+/g, '_')}` : '';
@@ -568,29 +578,52 @@ export default function PDFReaderClient() {
     }
   }, []);
 
-  const handleFitWidth = useCallback(() => {
-    if (!pdfDocument || !containerRef.current) return;
+  const recalculateZoom = useCallback(() => {
+    if (!pdfDocument || !containerRef.current || isResizing.current) return;
     pdfDocument.getPage(currentPage).then((page) => {
       const viewport = page.getViewport({ scale: 1 });
       const containerWidth = containerRef.current.clientWidth - 64; // pad space
-      const newZoom = containerWidth / viewport.width;
-      setZoom(Math.round(newZoom * 100) / 100);
-    }).catch(e => console.error(e));
-  }, [pdfDocument, currentPage]);
-
-  const handleFitPage = useCallback(() => {
-    if (!pdfDocument || !containerRef.current) return;
-    pdfDocument.getPage(currentPage).then((page) => {
-      const viewport = page.getViewport({ scale: 1 });
-      const containerWidth = containerRef.current.clientWidth - 64;
       const containerHeight = containerRef.current.clientHeight - 64;
       
-      const zoomWidth = containerWidth / viewport.width;
-      const zoomHeight = containerHeight / viewport.height;
-      const newZoom = Math.min(zoomWidth, zoomHeight);
-      setZoom(Math.round(newZoom * 100) / 100);
-    }).catch(e => console.error(e));
-  }, [pdfDocument, currentPage]);
+      if (fitMode === 'width') {
+        const newZoom = containerWidth / viewport.width;
+        setZoom(Math.round(newZoom * 100) / 100);
+      } else if (fitMode === 'page') {
+        const zoomWidth = containerWidth / viewport.width;
+        const zoomHeight = containerHeight / viewport.height;
+        const newZoom = Math.min(zoomWidth, zoomHeight);
+        setZoom(Math.round(newZoom * 100) / 100);
+      }
+    }).catch(e => console.error('Error recalculating zoom:', e));
+  }, [pdfDocument, currentPage, fitMode]);
+
+  const handleFitWidth = useCallback(() => {
+    setFitMode('width');
+  }, []);
+
+  const handleFitPage = useCallback(() => {
+    setFitMode('page');
+  }, []);
+
+  // Update zoom when fitMode changes
+  useEffect(() => {
+    if (fitMode !== 'custom') {
+      recalculateZoom();
+    }
+  }, [fitMode, recalculateZoom]);
+
+  // Set up ResizeObserver to recalculate zoom on panel/window size changes
+  useEffect(() => {
+    if (!containerRef.current || !pdfDocument) return;
+
+    const observer = new ResizeObserver(() => {
+      if (isResizing.current) return;
+      recalculateZoom();
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [pdfDocument, recalculateZoom]);
 
   const handlePDFSearch = (query) => {
     setPdfSearchQuery(query);
@@ -790,6 +823,7 @@ export default function PDFReaderClient() {
     setAnnotations([]);
     setChatHistory([]);
     setSidebarOpen(false); // reset
+    setActiveAnnotationMenu(null);
   };
 
   // Draggable Split resizer handler
@@ -813,6 +847,7 @@ export default function PDFReaderClient() {
       document.body.style.userSelect = 'auto';
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      recalculateZoom();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -862,6 +897,7 @@ export default function PDFReaderClient() {
       setSelectedText('');
       setSelectionCoords(null);
       setActiveRange(null);
+      setActiveAnnotationMenu(null);
     }
   };
 
@@ -908,6 +944,12 @@ export default function PDFReaderClient() {
     if (editingNoteId === id) setEditingNoteId(null);
   };
 
+  const handleDeleteAnnotationConfirmed = (id) => {
+    if (window.confirm('Are you sure you want to permanently delete this highlight and note?')) {
+      handleDeleteAnnotation(id);
+    }
+  };
+
   const handleStartEditNote = (ann) => {
     setEditingNoteId(ann.id);
     setTempNoteText(ann.comment || '');
@@ -918,6 +960,65 @@ export default function PDFReaderClient() {
       ann.id === id ? { ...ann, comment: tempNoteText } : ann
     ));
     setEditingNoteId(null);
+  };
+
+  const handleHighlightClick = useCallback((ann, e) => {
+    if (!containerRef.current) return;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    
+    const left = e.clientX - containerRect.left;
+    const top = e.clientY - containerRect.top + containerRef.current.scrollTop - 10;
+    
+    // Always query the latest annotation data from current state array
+    setAnnotations(currentAnns => {
+      const latestAnn = currentAnns.find(a => a.id === ann.id) || ann;
+      setActiveAnnotationMenu({
+        ann: latestAnn,
+        left: Math.max(10, Math.min(left - 160, containerRect.width - 330)),
+        top: Math.max(10, top - 180)
+      });
+      setTempNoteText(latestAnn.comment || '');
+      return currentAnns;
+    });
+
+    setSelectionCoords(null);
+  }, []);
+
+  const handleUpdateAnnotationColor = (id, color) => {
+    setAnnotations(prev => prev.map(ann => 
+      ann.id === id ? { ...ann, color } : ann
+    ));
+    setActiveAnnotationMenu(prev => {
+      if (prev && prev.ann.id === id) {
+        return {
+          ...prev,
+          ann: { ...prev.ann, color }
+        };
+      }
+      return prev;
+    });
+  };
+
+  const handleSaveNoteFromPopover = (id) => {
+    setAnnotations(prev => prev.map(ann => 
+      ann.id === id ? { ...ann, comment: tempNoteText } : ann
+    ));
+    setActiveAnnotationMenu(prev => {
+      if (prev && prev.ann.id === id) {
+        return {
+          ...prev,
+          ann: { ...prev.ann, comment: tempNoteText }
+        };
+      }
+      return prev;
+    });
+  };
+
+  const handleDeleteAnnotationFromPopover = (id) => {
+    if (window.confirm("Are you sure you want to permanently delete this highlight and note?")) {
+      handleDeleteAnnotation(id);
+      setActiveAnnotationMenu(null);
+    }
   };
 
   const runQuickQuery = (queryType) => {
@@ -1329,7 +1430,7 @@ export default function PDFReaderClient() {
                         Page {ann.page}
                       </span>
                       <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteAnnotation(ann.id); }}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteAnnotationConfirmed(ann.id); }}
                         className="ann-card__delete"
                         title="Delete highlight"
                       >
@@ -1680,14 +1781,14 @@ export default function PDFReaderClient() {
               </div>
 
               <div className="pdf-toolbar__group" style={{ marginLeft: 'auto' }}>
-                <button className="pdf-toolbar__btn" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
+                <button className="pdf-toolbar__btn" onClick={() => { setZoom(prev => Math.max(prev - 0.25, 0.5)); setFitMode('custom'); }} title="Zoom Out">
                   <ZoomOut size={16} />
                 </button>
                 <span className="zoom-text">{Math.round(zoom * 100)}%</span>
-                <button className="pdf-toolbar__btn" onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} title="Zoom In">
+                <button className="pdf-toolbar__btn" onClick={() => { setZoom(prev => Math.min(prev + 0.25, 3)); setFitMode('custom'); }} title="Zoom In">
                   <ZoomIn size={16} />
                 </button>
-                <button className="pdf-toolbar__btn" onClick={() => setZoom(1.25)} title="Reset Zoom">
+                <button className="pdf-toolbar__btn" onClick={() => { setZoom(1.25); setFitMode('custom'); }} title="Reset Zoom">
                   <Maximize2 size={16} />
                 </button>
                 <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
@@ -1731,6 +1832,7 @@ export default function PDFReaderClient() {
                     annotations={annotations}
                     onPageVisible={handlePageVisible}
                     rootRef={containerRef}
+                    onHighlightClick={handleHighlightClick}
                   />
                 ))}
               </div>
@@ -1766,6 +1868,112 @@ export default function PDFReaderClient() {
                     </button>
                     <button onClick={() => runQuickQuery('simplify')} className="action-btn" title="Explain in simple terms (ELI5)">
                       <HelpCircle size={12} /> ELI5
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Modernized Floating Annotation Popover Card */}
+              {activeAnnotationMenu && (
+                <div 
+                  className="pdf-annotation-popover"
+                  style={{
+                    left: `${activeAnnotationMenu.left}px`,
+                    top: `${activeAnnotationMenu.top}px`
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()} // Prevent selection clear
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="pdf-annotation-popover__header">
+                    <span className="pdf-annotation-popover__title">Highlight • Page {activeAnnotationMenu.ann.page}</span>
+                    <button 
+                      className="pdf-annotation-popover__close"
+                      onClick={() => setActiveAnnotationMenu(null)}
+                      title="Close Popover"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  
+                  <div className="pdf-annotation-popover__body">
+                    <div className="pdf-annotation-popover__quote-preview">
+                      "{activeAnnotationMenu.ann.text}"
+                    </div>
+
+                    <div className="pdf-annotation-popover__colors">
+                      <span className="popover-section-label">Highlight Color:</span>
+                      <div className="menu-colors">
+                        {[
+                          { val: '#FEF08A', name: 'Yellow' },
+                          { val: '#86EFAC', name: 'Green' },
+                          { val: '#93C5FD', name: 'Blue' },
+                          { val: '#F9A8D4', name: 'Pink' },
+                          { val: '#D8B4FE', name: 'Purple' },
+                          { val: '#FDBA74', name: 'Orange' }
+                        ].map((c) => (
+                          <button 
+                            key={c.val}
+                            onClick={() => handleUpdateAnnotationColor(activeAnnotationMenu.ann.id, c.val)}
+                            className={`color-btn ${activeAnnotationMenu.ann.color === c.val ? 'color-btn--active' : ''}`}
+                            style={{ backgroundColor: c.val }} 
+                            title={c.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pdf-annotation-popover__notes">
+                      <span className="popover-section-label">Study Notes:</span>
+                      <textarea
+                        value={tempNoteText}
+                        onChange={(e) => setTempNoteText(e.target.value)}
+                        placeholder="Add your study notes or questions..."
+                        rows={3}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                        {activeAnnotationMenu.ann.comment !== tempNoteText && (
+                          <button 
+                            onClick={() => handleSaveNoteFromPopover(activeAnnotationMenu.ann.id)}
+                            className="btn btn--gold-fill btn--small"
+                            style={{ padding: '4px 10px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Check size={12} /> Save Note
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pdf-annotation-popover__footer">
+                    <div className="pdf-annotation-popover__ai-actions">
+                      <button 
+                        onClick={() => {
+                          askAboutHighlight(activeAnnotationMenu.ann, 'explain');
+                          setActiveAnnotationMenu(null);
+                        }} 
+                        className="action-btn"
+                        title="Explain highlighted passage with AI"
+                      >
+                        <BookOpen size={12} /> Explain
+                      </button>
+                      <button 
+                        onClick={() => {
+                          askAboutHighlight(activeAnnotationMenu.ann, 'cases');
+                          setActiveAnnotationMenu(null);
+                        }} 
+                        className="action-btn"
+                        title="Find landmark cases with AI"
+                      >
+                        <Search size={12} /> Cases
+                      </button>
+                    </div>
+
+                    <button 
+                      onClick={() => handleDeleteAnnotationFromPopover(activeAnnotationMenu.ann.id)}
+                      className="popover-delete-btn"
+                      title="Delete highlight & note"
+                    >
+                      <Trash2 size={13} /> Delete
                     </button>
                   </div>
                 </div>

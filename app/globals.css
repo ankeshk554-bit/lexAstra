@@ -4189,3 +4189,196 @@ body.full-screen-page .scroll-progress {
   box-shadow: 0 12px 24px rgba(201, 168, 76, 0.12) !important;
   border-color: var(--gold) !important;
 }
+
+/* ---------- Premium Annotation Popover ---------- */
+.pdf-annotation-popover {
+  position: absolute;
+  z-index: 1000;
+  width: 330px;
+  background: rgba(6, 15, 29, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-gold) !important;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  color: var(--parchment) !important;
+  font-family: var(--font-ui);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: tooltipFade 0.2s ease;
+}
+
+.pdf-annotation-popover__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.pdf-annotation-popover__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-ui);
+}
+
+.pdf-annotation-popover__close {
+  background: transparent;
+  border: none;
+  color: var(--parchment);
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--transition-fast);
+}
+
+.pdf-annotation-popover__close:hover {
+  opacity: 1;
+}
+
+.pdf-annotation-popover__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pdf-annotation-popover__quote-preview {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: rgba(245, 240, 232, 0.85);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--gold);
+  max-height: 80px;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+
+.popover-section-label {
+  font-size: 10px;
+  color: rgba(245, 240, 232, 0.5);
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pdf-annotation-popover__colors {
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-annotation-popover__colors .menu-colors {
+  display: flex;
+  gap: 6px !important;
+  justify-content: flex-start !important;
+  padding: 4px 0;
+  border: none !important;
+}
+
+.pdf-annotation-popover__colors .color-btn {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.pdf-annotation-popover__colors .color-btn:hover {
+  transform: scale(1.15);
+}
+
+.pdf-annotation-popover__colors .color-btn--active {
+  border: 2px solid #ffffff !important;
+  transform: scale(1.15);
+  box-shadow: 0 0 8px var(--gold-dark) !important;
+}
+
+.pdf-annotation-popover__notes {
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-annotation-popover__notes textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-size: 13px;
+  resize: vertical;
+  min-height: 60px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.pdf-annotation-popover__notes textarea:focus {
+  border-color: var(--gold);
+}
+
+.pdf-annotation-popover__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.pdf-annotation-popover__ai-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pdf-annotation-popover__ai-actions .action-btn {
+  padding: 4px 8px !important;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  border: none;
+  color: var(--parchment) !important;
+  font-size: 11px !important;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast) !important;
+}
+
+.pdf-annotation-popover__ai-actions .action-btn:hover {
+  background: rgba(201, 168, 76, 0.15) !important;
+  color: var(--gold) !important;
+}
+
+.popover-delete-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444 !important;
+  font-size: 11px !important;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.popover-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
