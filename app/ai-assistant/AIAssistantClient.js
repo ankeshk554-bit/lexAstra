@@ -778,12 +778,6 @@ export default function AIAssistantClient() {
 
         <div className="chat-sidebar__footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button 
-            onClick={() => setShowApiKeyInput(true)} 
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
-          >
-            Configure DeepSeek Key
-          </button>
-          <button 
             onClick={() => setShowBackupModal(true)} 
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
           >
