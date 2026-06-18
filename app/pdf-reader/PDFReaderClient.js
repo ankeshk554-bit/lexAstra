@@ -1516,10 +1516,7 @@ export default function PDFReaderClient() {
                 <h3>Import Textbook / Bare Act</h3>
                 
                 {!uploadFile ? (
-                  <div 
-                    className="library-dropzone" 
-                    onClick={() => libraryFileInputRef.current.click()}
-                  >
+                  <>
                     <input 
                       type="file" 
                       accept=".pdf" 
@@ -1527,10 +1524,15 @@ export default function PDFReaderClient() {
                       ref={libraryFileInputRef} 
                       style={{ display: 'none' }} 
                     />
-                    <Upload size={36} className="dropzone-icon" />
-                    <p>Select a PDF textbook to save permanently</p>
-                    <span className="dropzone-sub">Click to browse documents</span>
-                  </div>
+                    <div 
+                      className="library-dropzone" 
+                      onClick={() => libraryFileInputRef.current.click()}
+                    >
+                      <Upload size={36} className="dropzone-icon" />
+                      <p>Select a PDF textbook to save permanently</p>
+                      <span className="dropzone-sub">Click to browse documents</span>
+                    </div>
+                  </>
                 ) : (
                   <div className="importer-form">
                     <div className="selected-file-details">
