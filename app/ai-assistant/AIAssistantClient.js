@@ -546,18 +546,35 @@ export default function AIAssistantClient() {
         signal: abortControllerRef.current.signal
       });
 
-      if (response.status === 401) {
+      if (!response.ok) {
         setIsLoading(false);
+        let errorMsg = `API request failed (Status: ${response.status}).`;
+        if (response.status === 400) {
+          errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
+        } else if (response.status === 401) {
+          errorMsg = 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the sidebar.';
+        } else if (response.status === 402) {
+          errorMsg = 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the sidebar.';
+        } else if (response.status === 403) {
+          errorMsg = 'Forbidden (Status 403). Access denied. Please ensure your API key has the correct permissions and your IP/region is allowed by DeepSeek.';
+        } else if (response.status === 429) {
+          errorMsg = 'Too Many Requests (Status 429). Rate limit exceeded. Please wait a moment before trying again.';
+        } else if (response.status >= 500) {
+          errorMsg = `Server Error (Status ${response.status}). The DeepSeek service might be experiencing temporary issues. Please try again later.`;
+        }
+        
+        const isKeyRelated = [400, 401, 402, 403].includes(response.status);
+        if (isKeyRelated && response.status !== 401 && response.status !== 402) {
+          errorMsg += ' You can update or clear your custom key via the **DeepSeek API Settings** in the sidebar.';
+        }
+
         setSessions(prev => prev.map(s => {
           if (s.id === currentSessionId) {
             return {
               ...s,
               messages: [
                 ...updatedMessages,
-                {
-                  role: 'assistant',
-                  content: 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the sidebar.'
-                }
+                { role: 'assistant', content: errorMsg }
               ]
             };
           }
@@ -565,28 +582,6 @@ export default function AIAssistantClient() {
         }));
         return;
       }
-
-      if (response.status === 402) {
-        setIsLoading(false);
-        setSessions(prev => prev.map(s => {
-          if (s.id === currentSessionId) {
-            return {
-              ...s,
-              messages: [
-                ...updatedMessages,
-                {
-                  role: 'assistant',
-                  content: 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the sidebar.'
-                }
-              ]
-            };
-          }
-          return s;
-        }));
-        return;
-      }
-
-      if (!response.ok) throw new Error('API request failed');
 
       // Add empty assistant message
       setSessions(prev => prev.map(s => 
@@ -645,9 +640,10 @@ export default function AIAssistantClient() {
         console.log('Generation stopped by user');
       } else {
         console.error('Chat error:', error);
+        const errorMsg = 'Network connection failed. Please check your internet connection and ensure your local server is running, or verify your API key configuration.';
         setSessions(prev => prev.map(s => {
           if (s.id === currentSessionId) {
-            return { ...s, messages: [...s.messages, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }] };
+            return { ...s, messages: [...updatedMessages, { role: 'assistant', content: errorMsg }] };
           }
           return s;
         }));
@@ -1015,7 +1011,7 @@ export default function AIAssistantClient() {
                             <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
                               {msg.content}
                             </ReactMarkdown>
-                            {msg.role === 'assistant' && (msg.content.includes('Authentication failed') || msg.content.includes('Insufficient Balance')) && (
+                            {msg.role === 'assistant' && (msg.content.includes('Authentication failed') || msg.content.includes('Insufficient Balance') || msg.content.includes('API key') || msg.content.includes('API Settings') || msg.content.includes('API Key')) && (
                               <div style={{ marginTop: '16px', background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.2)', padding: '16px', borderRadius: '8px' }}>
                                 <p style={{ fontSize: '13px', color: 'var(--navy)', fontWeight: 'bold', margin: '0 0 10px 0' }}>DeepSeek API Settings Required</p>
                                 <button onClick={() => setShowApiKeyModal(true)} className="btn btn--gold-fill btn--small" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
