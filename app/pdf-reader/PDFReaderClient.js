@@ -7,7 +7,7 @@ import {
   BookOpen, Search, Copy, List, Maximize2, AlertCircle, FileText,
   Menu, X, Database, Folder, Plus, RefreshCw, Cloud, ArrowLeft,
   ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2, Download,
-  PanelLeftOpen, PanelLeftClose
+  PanelLeftOpen, PanelLeftClose, Settings
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -441,6 +441,19 @@ export default function PDFReaderClient() {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [contextMode, setContextMode] = useState('search'); // 'search' | 'current' | 'selection'
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lexastra_deepseek_api_key') || '';
+    }
+    return '';
+  });
+  const [hasCustomApiKey, setHasCustomApiKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('lexastra_deepseek_api_key');
+    }
+    return false;
+  });
 
   const [examMode, setExamMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -1208,17 +1221,41 @@ export default function PDFReaderClient() {
     ];
 
     try {
+      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (customKey) {
+        headers['x-api-key'] = customKey;
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify({ messages: payloadMessages, examMode }),
       });
 
       if (response.status === 401) {
         setIsChatLoading(false);
-        setChatHistory(prev => [...prev, { role: 'assistant', content: 'Authentication failed. Please verify that the server-side API key is set.' }]);
+        setChatHistory(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the chat header.' 
+          }
+        ]);
+        return;
+      }
+
+      if (response.status === 402) {
+        setIsChatLoading(false);
+        setChatHistory(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the chat header.' 
+          }
+        ]);
         return;
       }
 
@@ -2200,6 +2237,15 @@ export default function PDFReaderClient() {
               </select>
               
               <button 
+                onClick={() => setShowApiKeyModal(true)}
+                className="pdf-toolbar__btn"
+                title="DeepSeek API Settings"
+                style={{ padding: '4px', opacity: 0.6, color: hasCustomApiKey ? '#C9A84C' : 'inherit' }}
+              >
+                <Settings size={14} />
+              </button>
+
+              <button 
                 onClick={handleClearChat}
                 className="pdf-toolbar__btn"
                 title="Clear Chat History"
@@ -2224,6 +2270,15 @@ export default function PDFReaderClient() {
                         {msg.role === 'assistant' ? formatPageLinks(msg.content) : msg.content}
                       </ReactMarkdown>
                     </div>
+
+                    {msg.role === 'assistant' && (msg.content.includes('Authentication failed') || msg.content.includes('Insufficient Balance') || msg.content.includes('API key configuration')) && (
+                      <div style={{ marginTop: '16px', background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.2)', padding: '16px', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '13px', color: 'var(--navy)', fontWeight: 'bold', margin: '0 0 10px 0' }}>DeepSeek API Settings Required</p>
+                        <button onClick={() => setShowApiKeyModal(true)} className="btn btn--gold-fill btn--small" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Settings size={12} /> Configure DeepSeek API Key
+                        </button>
+                      </div>
+                    )}
 
                     {msg.role === 'assistant' && (
                       <div className="chat-msg-actions">
@@ -2391,6 +2446,89 @@ export default function PDFReaderClient() {
                   style={{ display: 'none' }} 
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. DeepSeek API Key Settings Modal */}
+      {showApiKeyModal && (
+        <div className="pdf-modal-overlay">
+          <div className="pdf-modal-content" style={{ maxWidth: '400px' }}>
+            <div className="pdf-modal-header">
+              <h3>
+                <Settings size={20} style={{ color: 'var(--gold)', verticalAlign: 'middle', marginRight: '8px' }} /> DeepSeek API Settings
+              </h3>
+              <button onClick={() => setShowApiKeyModal(false)} className="close-modal-btn">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="pdf-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.4', margin: 0 }}>
+                Configure your own DeepSeek API Key. Your custom key will be stored securely in your browser's local storage and used directly for all AI queries.
+              </p>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = apiKeyInput.trim();
+                if (trimmed) {
+                  localStorage.setItem('lexastra_deepseek_api_key', trimmed);
+                  setHasCustomApiKey(true);
+                } else {
+                  localStorage.removeItem('lexastra_deepseek_api_key');
+                  setHasCustomApiKey(false);
+                }
+                setShowApiKeyModal(false);
+                alert('DeepSeek API Key settings updated successfully!');
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    DeepSeek API Key:
+                  </label>
+                  <input 
+                    type="password" 
+                    placeholder="sk-..."
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      fontSize: '14px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-gold)',
+                      background: '#ffffff',
+                      color: '#0B1F3A',
+                      outline: 'none'
+                    }}
+                    autoFocus
+                  />
+                </div>
+                
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem('lexastra_deepseek_api_key');
+                      setApiKeyInput('');
+                      setHasCustomApiKey(false);
+                      setShowApiKeyModal(false);
+                      alert('Custom API Key cleared. LexAstra will now fall back to the default server-side key.');
+                    }}
+                    className="btn btn--ghost"
+                    style={{ flex: 1, justifyContent: 'center', border: '1px solid var(--border-subtle)' }}
+                  >
+                    Clear Key
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn--gold-fill" 
+                    style={{ flex: 2, justifyContent: 'center' }}
+                  >
+                    Save API Key
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

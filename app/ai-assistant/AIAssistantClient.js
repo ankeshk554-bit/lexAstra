@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Download, Check, Plus, MessageSquare, Trash2, StopCircle, RefreshCw, PanelLeftOpen, PanelLeftClose, Maximize2, Minimize2 } from 'lucide-react';
+import { Copy, Download, Check, Plus, MessageSquare, Trash2, StopCircle, RefreshCw, PanelLeftOpen, PanelLeftClose, Maximize2, Minimize2, Settings } from 'lucide-react';
 import MermaidDiagram from '@/components/MermaidDiagram';
 
 // Utility to generate a simple UUID
@@ -195,6 +195,19 @@ export default function AIAssistantClient() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lexastra_deepseek_api_key') || '';
+    }
+    return '';
+  });
+  const [hasCustomApiKey, setHasCustomApiKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !!localStorage.getItem('lexastra_deepseek_api_key');
+    }
+    return false;
+  });
   const [showLocalProfileModal, setShowLocalProfileModal] = useState(false);
   const [localProfileInput, setLocalProfileInput] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -518,18 +531,58 @@ export default function AIAssistantClient() {
     abortControllerRef.current = new AbortController();
 
     try {
+      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (customKey) {
+        headers['x-api-key'] = customKey;
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify({ messages: updatedMessages, examMode }),
         signal: abortControllerRef.current.signal
       });
 
       if (response.status === 401) {
         setIsLoading(false);
-        alert('Authentication failed. Please verify that the server-side API key is set.');
+        setSessions(prev => prev.map(s => {
+          if (s.id === currentSessionId) {
+            return {
+              ...s,
+              messages: [
+                ...updatedMessages,
+                {
+                  role: 'assistant',
+                  content: 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the sidebar.'
+                }
+              ]
+            };
+          }
+          return s;
+        }));
+        return;
+      }
+
+      if (response.status === 402) {
+        setIsLoading(false);
+        setSessions(prev => prev.map(s => {
+          if (s.id === currentSessionId) {
+            return {
+              ...s,
+              messages: [
+                ...updatedMessages,
+                {
+                  role: 'assistant',
+                  content: 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the sidebar.'
+                }
+              ]
+            };
+          }
+          return s;
+        }));
         return;
       }
 
@@ -767,6 +820,26 @@ export default function AIAssistantClient() {
 
         <div className="chat-sidebar__footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button 
+            onClick={() => setShowApiKeyModal(true)}
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              color: hasCustomApiKey ? '#C9A84C' : 'rgba(255,255,255,0.5)', 
+              cursor: 'pointer', 
+              fontSize: '12px', 
+              textDecoration: 'none', 
+              width: '100%', 
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: hasCustomApiKey ? '600' : 'normal'
+            }}
+          >
+            <Settings size={12} /> {hasCustomApiKey ? 'DeepSeek API Key (Custom)' : 'Configure DeepSeek API Key'}
+          </button>
+          
+          <button 
             onClick={() => setShowBackupModal(true)} 
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
           >
@@ -938,9 +1011,19 @@ export default function AIAssistantClient() {
                         {msg.role === 'user' ? (
                           <p style={{ margin: 0, fontWeight: 500 }}>{msg.content}</p>
                         ) : (
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
-                            {msg.content}
-                          </ReactMarkdown>
+                          <>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
+                              {msg.content}
+                            </ReactMarkdown>
+                            {msg.role === 'assistant' && (msg.content.includes('Authentication failed') || msg.content.includes('Insufficient Balance')) && (
+                              <div style={{ marginTop: '16px', background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.2)', padding: '16px', borderRadius: '8px' }}>
+                                <p style={{ fontSize: '13px', color: 'var(--navy)', fontWeight: 'bold', margin: '0 0 10px 0' }}>DeepSeek API Settings Required</p>
+                                <button onClick={() => setShowApiKeyModal(true)} className="btn btn--gold-fill btn--small" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Settings size={14} /> Configure DeepSeek API Key
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                       
@@ -1154,6 +1237,119 @@ export default function AIAssistantClient() {
               >
                 Create Profile
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showApiKeyModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(11, 31, 58, 0.6)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 999999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            background: '#F5F2EB',
+            border: '1px solid #D1C4A5',
+            borderRadius: '16px',
+            padding: '24px 32px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            color: '#0B1F3A',
+            position: 'relative',
+            textAlign: 'left'
+          }}>
+            <button 
+              onClick={() => setShowApiKeyModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#666',
+                fontSize: '18px'
+              }}
+            >
+              ✕
+            </button>
+            
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0B1F3A', marginBottom: '8px' }}>
+              🔑 DeepSeek API Settings
+            </h3>
+            <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
+              Configure your own DeepSeek API Key. Your custom key will be stored securely in your browser's local storage and used directly for all AI queries.
+            </p>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = apiKeyInput.trim();
+              if (trimmed) {
+                localStorage.setItem('lexastra_deepseek_api_key', trimmed);
+                setHasCustomApiKey(true);
+              } else {
+                localStorage.removeItem('lexastra_deepseek_api_key');
+                setHasCustomApiKey(false);
+              }
+              setShowApiKeyModal(false);
+              alert('DeepSeek API Key settings updated successfully!');
+            }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  DeepSeek API Key:
+                </label>
+                <input 
+                  type="password" 
+                  placeholder="sk-..."
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1C4A5',
+                    background: '#ffffff',
+                    color: '#0B1F3A',
+                    outline: 'none'
+                  }}
+                  autoFocus
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('lexastra_deepseek_api_key');
+                    setApiKeyInput('');
+                    setHasCustomApiKey(false);
+                    setShowApiKeyModal(false);
+                    alert('Custom API Key cleared. LexAstra will now fall back to the default server-side key.');
+                  }}
+                  className="btn btn--ghost"
+                  style={{ flex: 1, justifyContent: 'center', border: '1px solid #cbd5e1' }}
+                >
+                  Clear Key
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn--gold-fill" 
+                  style={{ flex: 2, justifyContent: 'center' }}
+                >
+                  Save API Key
+                </button>
+              </div>
             </form>
           </div>
         </div>
