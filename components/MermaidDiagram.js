@@ -186,7 +186,6 @@ export default function MermaidDiagram({ chart }) {
       
       mermaidInstance.initialize({
         startOnLoad: false,
-        suppressErrorRendering: true,
         securityLevel: 'loose',
         theme: 'base',
         themeVariables: {
@@ -206,14 +205,6 @@ export default function MermaidDiagram({ chart }) {
       });
 
       const { svg: result } = await mermaidInstance.render(renderId, chartCode);
-      
-      // Check for error markers in the SVG
-      if (result && (result.includes('Syntax error') || 
-          result.includes('error-icon') || 
-          result.includes('parser-error'))) {
-        throw new Error('Error markers found in SVG output');
-      }
-      
       return result;
     };
 
