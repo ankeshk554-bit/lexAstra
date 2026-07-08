@@ -11,73 +11,70 @@ const sanitizeMermaidChart = (code) => {
   // 1. Remove markdown backticks if they are accidentally included inside the chart string
   sanitized = sanitized.replace(/```mermaid/g, '').replace(/```/g, '');
   
+  // Helper to sanitize a label (strips outer quotes, unescapes inner quotes, escapes double quotes)
+  const sanitizeLabel = (label) => {
+    let clean = label.trim();
+    if (clean.startsWith('"') && clean.endsWith('"')) {
+      clean = clean.substring(1, clean.length - 1);
+    }
+    // Unescape first to prevent double-escaping
+    clean = clean.replace(/\\"/g, '"');
+    // Escape all double quotes
+    return clean.replace(/"/g, '\\"');
+  };
+  
   // 2. Fix unquoted node labels for different shapes using robust matching:
   const quotedOrAny = '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"';
   
   // Double rounded: ((label))
   const doubleRoundRegex = new RegExp('([A-Za-z0-9_-]+)\\(\\(\\s*(' + quotedOrAny + '|(?:(?!\\)\\)).)*)\\s*\\)\\)', 'g');
   sanitized = sanitized.replace(doubleRoundRegex, (match, id, label) => {
-    const trimmed = label.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
-    const cleanLabel = trimmed.replace(/"/g, '\\"');
-    return `${id}(("${cleanLabel}"))`;
+    return `${id}(("${sanitizeLabel(label)}"))`;
   });
   
   // Single round: (label) - prevent matching if double round (check negative lookahead for parenthesises)
   const roundRegex = new RegExp('([A-Za-z0-9_-]+)\\((?!\\()\\s*(' + quotedOrAny + '|[^()\\n]+)\\s*\\)(?!\\))', 'g');
   sanitized = sanitized.replace(roundRegex, (match, id, label) => {
-    const trimmed = label.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
-    const cleanLabel = trimmed.replace(/"/g, '\\"');
-    return `${id}("${cleanLabel}")`;
+    return `${id}("${sanitizeLabel(label)}")`;
   });
   
   // Square: [label]
   const squareRegex = new RegExp('([A-Za-z0-9_-]+)\\[\\s*(' + quotedOrAny + '|[^\\]\\n]*)\\s*\\]', 'g');
   sanitized = sanitized.replace(squareRegex, (match, id, label) => {
-    const trimmed = label.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
-    const cleanLabel = trimmed.replace(/"/g, '\\"');
-    return `${id}["${cleanLabel}"]`;
+    return `${id}["${sanitizeLabel(label)}"]`;
   });
   
   // Double curly: {{label}}
   const doubleCurlyRegex = new RegExp('([A-Za-z0-9_-]+)\\{\\{\\s*(' + quotedOrAny + '|(?:(?!\\}\\}\\}).)*)\\s*\\}\\}', 'g');
   sanitized = sanitized.replace(doubleCurlyRegex, (match, id, label) => {
-    const trimmed = label.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
-    const cleanLabel = trimmed.replace(/"/g, '\\"');
-    return `${id}{{"${cleanLabel}"}}`;
+    return `${id}{{"${sanitizeLabel(label)}"}}`;
   });
   
   // Single curly: {label} - prevent matching if double curly (check negative lookahead for braces)
   const curlyRegex = new RegExp('([A-Za-z0-9_-]+)\\{(?!\\{)\\s*(' + quotedOrAny + '|[^{}\\n]+)\\s*\\}(?!\\})', 'g');
   sanitized = sanitized.replace(curlyRegex, (match, id, label) => {
-    const trimmed = label.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"')) return match;
-    const cleanLabel = trimmed.replace(/"/g, '\\"');
-    return `${id}{"${cleanLabel}"}`;
+    return `${id}{"${sanitizeLabel(label)}"}`;
   });
   
-  // 3. Fix accidentally quoted text inside vertical bar labels, e.g. -->|"label"|
-  // In Mermaid, quotes are invalid inside vertical bars. We strip them.
-  const arrowLabelRegex = /(-->|-.->|==>)\s*\|"([^|\n]*)"\|/g;
+  // 3. Fix vertical bar labels: strip outer quotes and replace any double quotes to prevent syntax errors
+  const arrowLabelRegex = /(-->|-.->|==>)\s*\|([^|\n]+)\|/g;
   sanitized = sanitized.replace(arrowLabelRegex, (match, arrow, label) => {
-    return `${arrow}|${label.trim()}|`;
+    let cleanLabel = label.trim();
+    if (cleanLabel.startsWith('"') && cleanLabel.endsWith('"')) {
+      cleanLabel = cleanLabel.substring(1, cleanLabel.length - 1);
+    }
+    // Replace remaining double quotes with single quotes inside vertical bars
+    cleanLabel = cleanLabel.replace(/"/g, "'");
+    return `${arrow}|${cleanLabel}|`;
   });
   
   // 4. Fix connection labels: A -- Yes --> B or A -- "Yes" --> B with potentially complex node shapes
   // We normalize this to the standard node1 -- "label" --> node2 format
   const nodePatternStr = `(?:[A-Za-z0-9_-]+(?:\\(\\(\\s*(?:${quotedOrAny}|(?:(?!\\)\\)).)*)\\s*\\)\\)|\\(\\s*(?:${quotedOrAny}|[^)\\n]*)\\s*\\)|\\[\\s*(?:${quotedOrAny}|[^\\]\\n]*)\\s*\\]|\\{\\{\\s*(?:${quotedOrAny}|(?:(?!\\}\\}\\}).)*)\\s*\\}\\}|\\{\\s*(?:${quotedOrAny}|[^}\\n]*)\\s*\\})?)`;
-  const connRegex = new RegExp(`(${nodePatternStr})\\s+--\\s+((?:"[^"\\n]*")|(?:[^"\\-\\n\\s>][^\\-\\n>]*))\\s+-->\\s+(${nodePatternStr})`, 'g');
+  const connRegex = new RegExp('(' + nodePatternStr + ')\\s+--\\s+(.+?)\\s+-->\\s+(' + nodePatternStr + ')', 'g');
   
   sanitized = sanitized.replace(connRegex, (match, node1, label, node2) => {
-    let cleanLabel = label.trim();
-    if (cleanLabel.startsWith('"') && cleanLabel.endsWith('"')) {
-      cleanLabel = cleanLabel.substring(1, cleanLabel.length - 1);
-    }
-    const escapedLabel = cleanLabel.replace(/"/g, '\\"');
-    return `${node1} -- "${escapedLabel}" --> ${node2}`;
+    return `${node1} -- "${sanitizeLabel(label)}" --> ${node2}`;
   });
 
   // 5. Ensure the chart starts with a valid diagram declaration keyword
