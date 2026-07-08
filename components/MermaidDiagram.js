@@ -421,7 +421,7 @@ export default function MermaidDiagram({ chart }) {
   return (
     <>
       <style>{`
-        /* 1. Explicitly style Mermaid node shapes with dark navy background and gold borders */
+        /* 1. Explicitly style Mermaid node shapes */
         .mermaid-scroll-container .node rect,
         .mermaid-scroll-container .node polygon,
         .mermaid-scroll-container .node circle,
@@ -432,38 +432,44 @@ export default function MermaidDiagram({ chart }) {
           stroke-width: 1.5px !important;
         }
         
-        /* 2. Force text and HTML labels inside foreignObject to be white */
+        /* 2. Force text and HTML labels inside to be white with high specificity */
         .mermaid-scroll-container text,
-        .mermaid-scroll-container text *,
+        .mermaid-scroll-container text tspan,
+        .mermaid-scroll-container text p,
+        .mermaid-scroll-container text span,
         .mermaid-scroll-container foreignObject,
-        .mermaid-scroll-container foreignObject * {
+        .mermaid-scroll-container foreignObject div,
+        .mermaid-scroll-container foreignObject p,
+        .mermaid-scroll-container foreignObject span,
+        .mermaid-scroll-container .nodeLabel,
+        .mermaid-scroll-container .edgeLabel {
           color: #ffffff !important;
           fill: #ffffff !important;
-        }
-        
-        /* 3. Ensure HTML label containers don't draw their own solid backgrounds */
-        .mermaid-scroll-container foreignObject div,
-        .mermaid-scroll-container foreignObject span {
+          background: transparent !important;
           background-color: transparent !important;
+          text-shadow: none !important;
         }
 
-        /* 4. Connection (edge) labels styling */
+        /* 3. Edge labels get a dark background so they are readable over lines */
         .mermaid-scroll-container .edgeLabel,
-        .mermaid-scroll-container .edgeLabel *,
+        .mermaid-scroll-container .edgeLabel rect {
+          background-color: #0B1F3A !important;
+          fill: #0B1F3A !important;
+        }
         .mermaid-scroll-container .edgeLabel span {
           color: #ffffff !important;
-          fill: #ffffff !important;
-          background-color: #0B1F3A !important;
+          background: transparent !important;
         }
         
-        /* 5. Force arrow path styling (gold lines) */
-        .mermaid-scroll-container .edgePath .path {
+        /* 4. Force arrow path styling (gold lines) */
+        .mermaid-scroll-container .edgePath .path,
+        .mermaid-scroll-container path.flowchart-link {
           stroke: #C9A84C !important;
           stroke-width: 1.5px !important;
           fill: none !important;
         }
         
-        /* 6. Force arrow head markers to be gold */
+        /* 5. Force arrow head markers to be gold */
         .mermaid-scroll-container marker path {
           fill: #C9A84C !important;
           stroke: none !important;
@@ -473,6 +479,7 @@ export default function MermaidDiagram({ chart }) {
           width: 100% !important;
           height: auto !important;
           max-width: none !important;
+          color: #ffffff !important; /* Base inheritance for foreignObject */
         }
       `}</style>
 
