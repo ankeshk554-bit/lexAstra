@@ -421,29 +421,58 @@ export default function MermaidDiagram({ chart }) {
   return (
     <>
       <style>{`
-        .mermaid-scroll-container * {
+        /* 1. Explicitly style Mermaid node shapes with dark navy background and gold borders */
+        .mermaid-scroll-container .node rect,
+        .mermaid-scroll-container .node polygon,
+        .mermaid-scroll-container .node circle,
+        .mermaid-scroll-container .node path,
+        .mermaid-scroll-container .node .label-container {
+          fill: #0B1F3A !important;
+          stroke: #C9A84C !important;
+          stroke-width: 1.5px !important;
+        }
+        
+        /* 2. Force text and HTML labels inside foreignObject to be white */
+        .mermaid-scroll-container text,
+        .mermaid-scroll-container text *,
+        .mermaid-scroll-container foreignObject,
+        .mermaid-scroll-container foreignObject * {
           color: #ffffff !important;
           fill: #ffffff !important;
         }
+        
+        /* 3. Ensure HTML label containers don't draw their own solid backgrounds */
+        .mermaid-scroll-container foreignObject div,
+        .mermaid-scroll-container foreignObject span {
+          background-color: transparent !important;
+        }
+
+        /* 4. Connection (edge) labels styling */
+        .mermaid-scroll-container .edgeLabel,
+        .mermaid-scroll-container .edgeLabel *,
+        .mermaid-scroll-container .edgeLabel span {
+          color: #ffffff !important;
+          fill: #ffffff !important;
+          background-color: #0B1F3A !important;
+        }
+        
+        /* 5. Force arrow path styling (gold lines) */
+        .mermaid-scroll-container .edgePath .path {
+          stroke: #C9A84C !important;
+          stroke-width: 1.5px !important;
+          fill: none !important;
+        }
+        
+        /* 6. Force arrow head markers to be gold */
+        .mermaid-scroll-container marker path {
+          fill: #C9A84C !important;
+          stroke: none !important;
+        }
+
         .mermaid-scroll-container svg {
           width: 100% !important;
           height: auto !important;
           max-width: none !important;
-        }
-        .mermaid-scroll-container foreignObject div,
-        .mermaid-scroll-container foreignObject span,
-        .mermaid-scroll-container foreignObject p,
-        .mermaid-scroll-container foreignObject label,
-        .mermaid-scroll-container foreignObject * {
-          color: #ffffff !important;
-          background-color: transparent !important;
-        }
-        /* Style arrow labels on connections */
-        .mermaid-scroll-container .edgeLabel,
-        .mermaid-scroll-container .edgeLabel * {
-          color: #ffffff !important;
-          background-color: #0B1F3A !important;
-          fill: #ffffff !important;
         }
       `}</style>
 
