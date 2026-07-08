@@ -281,42 +281,42 @@ const SUBJECTS = [
 const getExamPresets = (mode, currentPage) => {
   const presets = {
     'General': [
-      { label: '📑 Summarize Page', prompt: `Summarize page ${currentPage} of the document in structured bullet points.`, title: 'Generate a bulleted summary of this page' },
-      { label: '🔑 Key Terms', prompt: `Identify and explain the key legal terms and doctrines discussed on page ${currentPage} of the document.`, title: 'Explain key legal terms on this page' },
-      { label: '📊 Flowchart Analysis', prompt: `Analyze the legal process, hierarchy, or sections discussed on page ${currentPage} and render it as a Mermaid flowchart.`, title: 'Draw flowchart of legal process on page' },
-      { label: '🔍 Indepth Analysis', prompt: `Provide an in-depth article/section-by-section legal analysis of the provisions on page ${currentPage}, including core ingredients, exceptions, and punishments.`, title: 'Detailed section/article breakdown' },
-      { label: '❓ Mock Question', prompt: `Formulate a typical Judiciary or CLAT Exam question based on the legal doctrines on page ${currentPage} and provide a model answer with sections.`, title: 'Create practice question based on this page' }
+      { label: '🧩 Extract Core Elements', prompt: `Break down the legal provisions on page ${currentPage} into a structured list of essential ingredients (e.g., mens rea, actus reus, conditions precedent). Use bullet points for clarity.`, title: 'Breakdown statutory ingredients' },
+      { label: '⚖️ Find Landmark Cases', prompt: `Identify 3-5 landmark Indian Supreme Court or High Court cases relevant to the sections on page ${currentPage}. For each case, provide the Citation and a concise 1-sentence Ratio Decidendi.`, title: 'Find related landmark judgments' },
+      { label: '⚠️ Exceptions & Provisos', prompt: `List all the exceptions, provisos, and legal defenses mentioned or applicable to the provisions on page ${currentPage}. Explain when the general rule does NOT apply.`, title: 'Analyze exceptions and defenses' },
+      { label: '💡 Practical Scenario', prompt: `Create a practical, real-world hypothetical scenario involving parties 'A' and 'B' to illustrate how the law on page ${currentPage} is applied in court. Provide the solution based on the text.`, title: 'Illustrate with a hypothetical scenario' },
+      { label: '📊 Procedural Flowchart', prompt: `Analyze the procedural steps or legal hierarchy discussed on page ${currentPage} and render it as a Mermaid flowchart for quick visual memorization.`, title: 'Draw flowchart of legal process on page' }
     ],
     'Judiciary': [
-      { label: '📝 Frame Mains Question', prompt: `Frame a structured Mains examination question based on the legal principles on page ${currentPage} and write a model answer following the Introduction -> Statutory Provision -> Essential Ingredients -> Exceptions -> Landmark Cases -> Conclusion template.`, title: 'Frame a Mains Judiciary question' },
+      { label: '📝 Frame Mains Question', prompt: `Frame a structured Mains examination question based on the legal principles on page ${currentPage} and write a model answer following the standard format: Introduction -> Statutory Provision -> Essential Ingredients -> Exceptions -> Landmark Cases -> Conclusion.`, title: 'Frame a Mains Judiciary question' },
       { label: '⚖️ Case Law Application', prompt: `Analyze the provisions on page ${currentPage} and list 3-5 landmark Supreme Court cases that apply these provisions, including ratio decidendi and citation.`, title: 'Find case laws for these provisions' },
-      { label: '📜 Judgment Format', prompt: `Explain how the legal provisions on page ${currentPage} are applied practically by a judge when writing a civil or criminal judgment.`, title: 'Judgment writing application' }
+      { label: '📜 Judgment Format', prompt: `Explain how the legal provisions on page ${currentPage} are applied practically by a judge when framing issues or charges in a civil or criminal judgment.`, title: 'Judgment writing application' }
     ],
     'CLAT PG': [
-      { label: '🧠 Jurisprudential Analysis', prompt: `Analyze the concepts on page ${currentPage} from a jurisprudential perspective. Identify the ratio decidendi vs obiter dicta, and trace their constitutional evolution.`, title: 'Analytical case-law analysis' },
-      { label: '🏛️ Constitutional Validity', prompt: `Discuss the constitutional validity of the provisions on page ${currentPage} using the lens of constitutional morality and living constitution doctrine.`, title: 'Constitutional morality critique' }
+      { label: '🧠 Jurisprudential Analysis', prompt: `Analyze the concepts on page ${currentPage} from a jurisprudential perspective. Identify the ratio decidendi vs obiter dicta, and trace their constitutional or historical evolution.`, title: 'Analytical case-law analysis' },
+      { label: '🏛️ Constitutional Validity', prompt: `Discuss the constitutional validity of the provisions on page ${currentPage} using the lens of constitutional morality, fundamental rights, and living constitution doctrine.`, title: 'Constitutional morality critique' }
     ],
     'CLAT UG': [
-      { label: '💡 Legal Aptitude Guide', prompt: `Explain the legal principles on page ${currentPage} in simple, accessible terms for a beginner, and provide 2 mock scenario-based questions (facts + principle) to test legal reasoning.`, title: 'Simplify for Legal Aptitude' },
-      { label: '📖 Passage Summary', prompt: `Create a passage-based comprehension summary of page ${currentPage} with key takeaways.`, title: 'Passage comprehension summary' }
+      { label: '💡 Legal Aptitude Guide', prompt: `Explain the legal principles on page ${currentPage} in simple, accessible terms for a beginner, and provide 2 mock scenario-based questions (Facts + Principle) to test legal reasoning.`, title: 'Simplify for Legal Aptitude' },
+      { label: '📖 Passage Summary', prompt: `Create a passage-based comprehension summary of page ${currentPage} with key takeaways, designed for a reading comprehension test.`, title: 'Passage comprehension summary' }
     ],
     'AIBE': [
-      { label: '📖 Open Book Navigator', prompt: `Guide me on how to navigate the Bare Act for the provisions on page ${currentPage} during the open-book AIBE exam. List key sections and search keywords.`, title: 'Open book bare act navigation tips' },
-      { label: '⚖️ Quick Rule Index', prompt: `Summarize the rules and exceptions on page ${currentPage} in a direct, easy-to-refer format for objective questions.`, title: 'Quick reference rules' }
+      { label: '📖 Bare Act Navigator', prompt: `Guide me on how to quickly locate and navigate the provisions on page ${currentPage} within the Bare Act Index during the open-book AIBE exam. List key sections and search keywords.`, title: 'Open book bare act navigation tips' },
+      { label: '⚖️ Quick Rule Index', prompt: `Summarize the rules and exceptions on page ${currentPage} in a direct, easy-to-refer format tailored for objective multiple-choice questions.`, title: 'Quick reference rules' }
     ],
     'APO': [
-      { label: '👮 Prosecution Steps', prompt: `Explain the procedural steps a prosecution officer must take under BNSS/BNS/BSA regarding the matters on page ${currentPage}. Draw a sequence flowchart.`, title: 'Prosecution steps analysis' },
-      { label: '⛓️ Evidence Chain', prompt: `Detail the evidentiary requirements, admissibility standards, and burden of proof under BSA for the offences or issues mentioned on page ${currentPage}.`, title: 'Evidence chain analysis' },
-      { label: '🔍 Definition & Section Quiz', prompt: `Based on page ${currentPage}, formulate 3 BPSC APO-style multiple-choice questions testing exact Section numbers, statutory definition clauses, or specific acts details (like who drafted it, or parts/chapters) under BNS, BNSS, and BSA (with IPC/CrPC/Evidence equivalents in parentheses). Provide answers with detailed reasons.`, title: 'APO Section & Definition Quiz' },
-      { label: '⚖️ Case Law & Ratios', prompt: `Formulate 2 mock questions based on the landmark case laws related to the concepts on page ${currentPage} (matching case names to ratios/subjects like Sarla Mudgal, RM Malkani, or Barendra Kumar Ghosh), and provide the model solution.`, title: 'APO Landmark Cases Quiz' }
+      { label: '👮 Prosecution Steps', prompt: `Explain the procedural steps and burden of proof a prosecution officer must establish under the provisions on page ${currentPage}. Detail the evidentiary requirements.`, title: 'Prosecution steps analysis' },
+      { label: '⛓️ Charge Framing', prompt: `Based on the offences mentioned on page ${currentPage}, explain how charges would be framed in a trial court. What specific ingredients must the prosecution prove?`, title: 'Charge framing analysis' },
+      { label: '🔍 BPSC APO MCQs', prompt: `Based on page ${currentPage}, formulate 5 BPSC APO-style multiple-choice questions testing exact Section numbers, statutory definition clauses, or specific acts details (with IPC/CrPC equivalents). Provide answers with detailed reasons.`, title: 'APO Section & Definition Quiz' },
+      { label: '⚖️ Landmark Ratios', prompt: `Formulate 3 mock questions based on the landmark case laws related to the concepts on page ${currentPage}, focusing on matching case names to specific legal ratios or doctrines. Provide the model solution.`, title: 'APO Landmark Cases Quiz' }
     ],
     'UGC NET Law': [
-      { label: '🎓 Theoretical Analysis', prompt: `Explain the theoretical underpinnings of the legal concepts on page ${currentPage}. Connect them to schools of jurisprudence (positivism, natural law, etc.) and cite relevant jurists.`, title: 'Academic theoretical analysis' },
+      { label: '🎓 Theoretical Analysis', prompt: `Explain the theoretical underpinnings of the legal concepts on page ${currentPage}. Connect them to specific schools of jurisprudence (positivism, natural law, etc.) and cite relevant jurists.`, title: 'Academic theoretical analysis' },
       { label: '📋 Jurist Opinions', prompt: `List and explain the views of major jurists (Salmond, Austin, Hart, Kelsen) on the legal subjects discussed on page ${currentPage}.`, title: 'Jurist viewpoints reference' }
     ],
     'CUET PG Law': [
-      { label: '⚖️ Distinction Table', prompt: `Create a comparative distinction table for the key legal concepts discussed on page ${currentPage} (e.g. distinguishing similar sounding terms).`, title: 'Comparison table' },
-      { label: '📝 Concept Definition', prompt: `Define the core legal terms on page ${currentPage} in a clear, precise format optimized for multiple-choice questions.`, title: 'Concept definition' }
+      { label: '⚖️ Distinction Table', prompt: `Create a comparative distinction table for the key legal concepts discussed on page ${currentPage} (e.g. distinguishing similar sounding terms or offences).`, title: 'Comparison table' },
+      { label: '📝 Concept Definition', prompt: `Define the core legal terms on page ${currentPage} in a clear, precise format optimized for direct multiple-choice questions.`, title: 'Concept definition' }
     ],
     'SEBI Legal': [
       { label: '🏢 Regulatory Compliance', prompt: `Analyze the compliance requirements, regulatory procedures, and SEBI powers associated with the provisions on page ${currentPage}.`, title: 'Securities regulation compliance' },
@@ -2958,7 +2958,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
             <div className="context-modes">
               <span className="context-label">AI Search Context:</span>
               <div className="context-options">
-                <label className={`context-option ${contextMode === 'search' ? 'active' : ''}`}>
+                <label className={`context-option ${contextMode === 'search' ? 'active' : ''}`} title="Automatically scans the document for related sections, cross-references, and adjacent pages.">
                   <input 
                     type="radio" 
                     name="context" 
@@ -2966,9 +2966,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                     checked={contextMode === 'search'}
                     onChange={() => setContextMode('search')}
                   />
-                  Smart RAG
+                  Smart Legal Search
                 </label>
-                <label className={`context-option ${contextMode === 'current' ? 'active' : ''}`}>
+                <label className={`context-option ${contextMode === 'current' ? 'active' : ''}`} title="Strictly restricts the AI's knowledge to the current page. Best for highly specific page queries.">
                   <input 
                     type="radio" 
                     name="context" 
@@ -2976,7 +2976,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                     checked={contextMode === 'current'}
                     onChange={() => setContextMode('current')}
                   />
-                  Page {currentPage}
+                  Page {currentPage} Only
                 </label>
                 {selectedText && (
                   <label className={`context-option ${contextMode === 'selection' ? 'active' : ''}`}>
