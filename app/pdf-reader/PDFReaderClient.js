@@ -485,6 +485,18 @@ export default function PDFReaderClient() {
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isDraftingNote, setIsDraftingNote] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [currentDocContext, setCurrentDocContext] = useState('');
+
+  // Live Context Tracker for Bare Acts
+  useEffect(() => {
+    const pt = pageTexts.find(p => p.pageNumber === currentPage);
+    if (pt && pt.text) {
+      const match = pt.text.match(/(?:Section|Article|Chapter|Part)\s+[0-9A-Z]+/i);
+      if (match) {
+        setCurrentDocContext(match[0]);
+      }
+    }
+  }, [currentPage, pageTexts]);
 
   // Refs
   const containerRef = useRef(null);
@@ -1114,16 +1126,19 @@ export default function PDFReaderClient() {
   const runQuickQuery = (queryType) => {
     if (!selectedText || !selectionCoords) return;
     const targetPage = selectionCoords.page;
+    const pageText = pageTexts.find(pt => pt.pageNumber === targetPage)?.text || '';
     
     let prompt = '';
+    const contextPrefix = pageText ? `[Full Page Context for Reference]:\n${pageText}\n\n[Analyze this specific highlighted text]:\n"${selectedText}"\n\n` : `Highlighted text: "${selectedText}"\n\n`;
+
     if (queryType === 'explain') {
-      prompt = `Explain this legal passage from page ${targetPage} in detail:\n\n"${selectedText}"`;
+      prompt = `${contextPrefix}Analyze this highlighted text within the provided page context. Explain its legal effect, identify whether it constitutes a substantive right, procedural rule, or exception, and clarify its scope.`;
     } else if (queryType === 'summarize') {
-      prompt = `Provide a structured, bulleted summary of this passage from page ${targetPage}:\n\n"${selectedText}"`;
+      prompt = `${contextPrefix}Break down the highlighted statutory provision into a structured, numbered list of its essential ingredients (e.g., mens rea, actus reus, or conditions precedent).`;
     } else if (queryType === 'cases') {
-      prompt = `What are the landmark Indian Supreme Court cases, ratio, and citations related to this passage from page ${targetPage}:\n\n"${selectedText}"`;
+      prompt = `${contextPrefix}Identify landmark or recent Supreme Court/High Court cases interpreting the highlighted clause/section within the provided context. Provide a brief ratio decidendi for each.`;
     } else if (queryType === 'simplify') {
-      prompt = `Explain this legal passage from page ${targetPage} in simple terms (explain it to a beginner / ELI5):\n\n"${selectedText}"`;
+      prompt = `${contextPrefix}Create a practical hypothetical scenario involving parties 'A' and 'B' (or relevant actors) to illustrate how the highlighted provision is applied in reality.`;
     }
 
     handleSendChat(prompt, 'selection', selectedText);
@@ -1136,11 +1151,14 @@ export default function PDFReaderClient() {
   };
 
   const askAboutHighlight = (ann, queryType) => {
+    const pageText = pageTexts.find(pt => pt.pageNumber === ann.page)?.text || '';
+    const contextPrefix = pageText ? `[Full Page Context for Reference]:\n${pageText}\n\n[Analyze this specific highlighted text]:\n"${ann.text}"\n\n` : `Highlighted text: "${ann.text}"\n\n`;
+    
     let prompt = '';
     if (queryType === 'explain') {
-      prompt = `Explain this highlighted passage from page ${ann.page} of the document in detail:\n\n"${ann.text}"`;
+      prompt = `${contextPrefix}Analyze this highlighted text within the provided page context. Explain its legal effect, identify whether it constitutes a substantive right, procedural rule, or exception, and clarify its scope.`;
     } else if (queryType === 'cases') {
-      prompt = `What are the landmark Indian Supreme Court cases, ratio, and citations related to this highlighted passage from page ${ann.page} of the document:\n\n"${ann.text}"`;
+      prompt = `${contextPrefix}Identify landmark or recent Supreme Court/High Court cases interpreting the highlighted clause/section within the provided context. Provide a brief ratio decidendi for each.`;
     }
 
     handleSendChat(prompt, 'selection', ann.text);
@@ -1866,14 +1884,14 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                             <button 
                               onClick={(e) => { e.stopPropagation(); askAboutHighlight(ann, 'explain'); }}
                               className="ann-card__ai-btn"
-                              title="Explain highlighted passage with AI"
+                              title="Interpret clause within page context"
                             >
-                              <BookOpen size={10} /> Explain
+                              <BookOpen size={10} /> Interpret
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); askAboutHighlight(ann, 'cases'); }}
                               className="ann-card__ai-btn"
-                              title="Find landmark cases with AI"
+                              title="Find landmark cases interpreting this clause"
                             >
                               <Search size={10} /> Cases
                             </button>
@@ -2438,6 +2456,33 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               </div>
             </header>
 
+            {/* Live Context Banner */}
+            {currentDocContext && (
+              <div style={{
+                position: 'absolute',
+                top: '52px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(0,0,0,0.08)',
+                borderTop: 'none',
+                borderBottomLeftRadius: '8px',
+                borderBottomRightRadius: '8px',
+                padding: '4px 12px',
+                fontSize: '11px',
+                fontWeight: '600',
+                color: 'var(--navy)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span style={{ color: 'var(--gold)' }}>📍</span> Currently viewing: {currentDocContext}
+              </div>
+            )}
+
             {/* Canvas + Text Layer Wrapper */}
             <div 
               className={`pdf-render-scroll theme-${readerTheme}`}
@@ -2479,17 +2524,17 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                   </div>
                   <div className="menu-divider" />
                   <div className="menu-actions" style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => runQuickQuery('explain')} className="action-btn" title="Explain selected text with AI">
-                      <BookOpen size={12} /> Explain
+                    <button onClick={() => runQuickQuery('explain')} className="action-btn" title="Interpret clause within page context">
+                      <BookOpen size={12} /> Interpret
                     </button>
-                    <button onClick={() => runQuickQuery('summarize')} className="action-btn" title="Summarize selected text with AI">
-                      <FileText size={12} /> Summarize
+                    <button onClick={() => runQuickQuery('summarize')} className="action-btn" title="Break down essential ingredients">
+                      <List size={12} /> Elements
                     </button>
-                    <button onClick={() => runQuickQuery('cases')} className="action-btn" title="Find landmark cases with AI">
+                    <button onClick={() => runQuickQuery('cases')} className="action-btn" title="Find landmark cases interpreting this clause">
                       <Scale size={12} /> Cases
                     </button>
-                    <button onClick={() => runQuickQuery('simplify')} className="action-btn" title="Explain in simple terms (ELI5)">
-                      <HelpCircle size={12} /> ELI5
+                    <button onClick={() => runQuickQuery('simplify')} className="action-btn" title="Create a hypothetical scenario">
+                      <HelpCircle size={12} /> Scenario
                     </button>
                   </div>
                 </div>
@@ -2601,9 +2646,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                           setActiveAnnotationMenu(null);
                         }} 
                         className="action-btn"
-                        title="Explain highlighted passage with AI"
+                        title="Interpret clause within page context"
                       >
-                        <BookOpen size={12} /> Explain
+                        <BookOpen size={12} /> Interpret
                       </button>
                       <button 
                         onClick={() => {
@@ -2611,7 +2656,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                           setActiveAnnotationMenu(null);
                         }} 
                         className="action-btn"
-                        title="Find landmark cases with AI"
+                        title="Find landmark cases interpreting this clause"
                       >
                         <Search size={12} /> Cases
                       </button>
@@ -2731,13 +2776,15 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                                   onClick={() => askAboutHighlight(ann, 'explain')}
                                   className="btn btn--primary btn--small"
                                   style={{ fontSize: '10px', padding: '3px 6px', gap: '2px' }}
+                                  title="Interpret clause within page context"
                                 >
-                                  <BookOpen size={10} /> Explain
+                                  <BookOpen size={10} /> Interpret
                                 </button>
                                 <button 
                                   onClick={() => askAboutHighlight(ann, 'cases')}
                                   className="btn btn--ghost btn--small"
                                   style={{ fontSize: '10px', padding: '3px 6px', gap: '2px' }}
+                                  title="Find landmark cases interpreting this clause"
                                 >
                                   <Search size={10} /> Cases
                                 </button>
