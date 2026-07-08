@@ -3,9 +3,7 @@
 import React, { useEffect, useState, useId, useRef } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, X, Code } from 'lucide-react';
 
-// ═══════════════════════════════════════════════════════════════
-// PASS 0 — Minimal cleanup (strip markdown fences, ensure declaration)
-// ═══════════════════════════════════════════════════════════════
+// PASS 0 - Minimal cleanup (strip markdown fences, ensure declaration)
 const minimalClean = (code) => {
   if (!code) return '';
   let s = code.replace(/```mermaid\s*/gi, '').replace(/```/g, '').trim();
@@ -20,9 +18,7 @@ const minimalClean = (code) => {
   return s;
 };
 
-// ═══════════════════════════════════════════════════════════════
-// PASS 1 — Conservative sanitization (only fix known-broken patterns)
-// ═══════════════════════════════════════════════════════════════
+// PASS 1 - Conservative sanitization (only fix known-broken patterns)
 const conservativeSanitize = (code) => {
   if (!code) return '';
   let s = code.replace(/```mermaid\s*/gi, '').replace(/```/g, '').trim();
@@ -41,9 +37,8 @@ const conservativeSanitize = (code) => {
     }
 
     // Fix "end" used as node ID (but NOT the subgraph-closing "end")
-    // Only rename if end is followed by a shape or arrow on the SAME line
     if (/^end$/i.test(trimmed)) {
-      out.push(line); // subgraph closer — keep as-is
+      out.push(line);
       continue;
     }
 
@@ -52,12 +47,12 @@ const conservativeSanitize = (code) => {
     processed = processed.replace(/\bend\s*(?=\[|\(|\{)/g, 'nd_end');
     processed = processed.replace(/(-->|-.->|==>)\s*end\b(?!\s*$)/g, '$1 nd_end');
 
-    // Fix subgraph titles with spaces: "subgraph My Title" → subgraph sg_id ["My Title"]
+    // Fix subgraph titles with spaces: "subgraph My Title" -> subgraph sg_id ["My Title"]
     if (/^\s*subgraph\s+/i.test(processed)) {
       const match = processed.match(/^(\s*subgraph)\s+(.+)$/i);
       if (match) {
         const title = match[2].trim();
-        // Already has bracket syntax or is a single word — leave it
+        // Already has bracket syntax or is a single word
         if (!title.includes('[') && title.includes(' ')) {
           const id = 'sg_' + title.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
           processed = `${match[1]} ${id} ["${title}"]`;
@@ -80,9 +75,7 @@ const conservativeSanitize = (code) => {
   return s;
 };
 
-// ═══════════════════════════════════════════════════════════════
-// PASS 2 — Bare-bones: extract ONLY node IDs and arrows
-// ═══════════════════════════════════════════════════════════════
+// PASS 2 - Bare-bones: extract ONLY node IDs and arrows
 const stripToBareBones = (code) => {
   if (!code) return '';
   let s = code.replace(/```mermaid\s*/gi, '').replace(/```/g, '').trim();
@@ -96,24 +89,23 @@ const stripToBareBones = (code) => {
 
     // Skip declarations, style directives, comments
     if (/^(flowchart|graph|%%|style |classDef |class |linkStyle |click |direction )/i.test(trimmed)) continue;
-    // Skip subgraph/end — we'll flatten the graph
+    // Skip subgraph/end
     if (/^(subgraph|end$)/i.test(trimmed)) continue;
 
-    // Extract all node IDs from the line (strip shape content)
+    // Extract all node IDs from the line
     let simplified = trimmed;
-    // Remove all shape content greedily
-    simplified = simplified.replace(/\(\("[^"]*"\)\)/g, ''); // (("label"))
-    simplified = simplified.replace(/\(\(.*?\)\)/g, '');     // ((label))
-    simplified = simplified.replace(/\{\{"[^"]*"\}\}/g, ''); // {{"label"}}
-    simplified = simplified.replace(/\{\{.*?\}\}/g, '');     // {{label}}
-    simplified = simplified.replace(/\["[^"]*"\]/g, '');     // ["label"]
-    simplified = simplified.replace(/\[[^\]]*\]/g, '');      // [label]
-    simplified = simplified.replace(/\("(?:[^"\\]|\\.)*"\)/g, '');  // ("label")
-    simplified = simplified.replace(/\([^)]*\)/g, '');       // (label)
-    simplified = simplified.replace(/\{"[^"]*"\}/g, '');     // {"label"}
-    simplified = simplified.replace(/\{[^}]*\}/g, '');       // {label}
+    simplified = simplified.replace(/\(\("[^"]*"\)\)/g, '');
+    simplified = simplified.replace(/\(\(.*?\)\)/g, '');
+    simplified = simplified.replace(/\{\{"[^"]*"\}\}/g, '');
+    simplified = simplified.replace(/\{\{.*?\}\}/g, '');
+    simplified = simplified.replace(/\["[^"]*"\]/g, '');
+    simplified = simplified.replace(/\[[^\]]*\]/g, '');
+    simplified = simplified.replace(/\("(?:[^"\\]|\\.)*"\)/g, '');
+    simplified = simplified.replace(/\([^)]*\)/g, '');
+    simplified = simplified.replace(/\{"[^"]*"\}/g, '');
+    simplified = simplified.replace(/\{[^}]*\}/g, '');
 
-    // Remove connection labels:  -- "label" -->  →  -->
+    // Remove connection labels
     simplified = simplified.replace(/\s+--\s+"[^"]*"\s+-->/g, ' -->');
     simplified = simplified.replace(/\s+--\s+\S+\s+-->/g, ' -->');
     simplified = simplified.replace(/\s+==\s+"[^"]*"\s+==>/g, ' ==>');
@@ -121,11 +113,10 @@ const stripToBareBones = (code) => {
     simplified = simplified.replace(/-\.\s+"[^"]*"\s+\.->/g, ' -.->');
     simplified = simplified.replace(/-\.\s+\S+\s+\.->/g, ' -.->');
 
-    // Remove pipe labels:  -->|label|  →  -->
+    // Remove pipe labels
     simplified = simplified.replace(/(-->|-.->|==>)\s*\|[^|]*\|/g, '$1');
 
-    // Now extract node IDs connected by arrows
-    // Split by arrow patterns
+    // Extract node IDs connected by arrows
     const parts = simplified.split(/(-->|-.->|==>)/).map(p => p.trim()).filter(Boolean);
     
     for (let i = 0; i < parts.length - 2; i += 2) {
@@ -134,7 +125,6 @@ const stripToBareBones = (code) => {
       const dst = parts[i + 2]?.replace(/[^A-Za-z0-9_-]/g, '').trim();
       
       if (src && dst && arrow) {
-        // Skip reserved keywords
         const safeSrc = /^(end|subgraph|style|class)$/i.test(src) ? 'nd_' + src : src;
         const safeDst = /^(end|subgraph|style|class)$/i.test(dst) ? 'nd_' + dst : dst;
         const edge = `${safeSrc} --> ${safeDst}`;
@@ -146,7 +136,6 @@ const stripToBareBones = (code) => {
     }
   }
 
-  // Must have at least one edge
   if (outLines.length <= 1) {
     outLines.push('  A["No diagram data"] --> B["Please regenerate"]');
   }
@@ -154,16 +143,17 @@ const stripToBareBones = (code) => {
   return outLines.join('\n');
 };
 
-
-// ═══════════════════════════════════════════════════════════════
 // COMPONENT
-// ═══════════════════════════════════════════════════════════════
 export default function MermaidDiagram({ chart }) {
   const [svg, setSvg] = useState('');
   const [showRawCode, setShowRawCode] = useState(false);
-  const [renderPass, setRenderPass] = useState(0); // which pass succeeded (for debug)
+  const [renderPass, setRenderPass] = useState(0); 
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [baseWidth, setBaseWidth] = useState(0);
+
+  const containerRef = useRef(null);
+  const fullscreenContainerRef = useRef(null);
   const id = useId();
   const mermaidId = `mermaid-${id.replace(/:/g, '')}`;
 
@@ -175,12 +165,62 @@ export default function MermaidDiagram({ chart }) {
     });
   };
 
+  // Auto-fit calculation when SVG rendered or container width changes
+  useEffect(() => {
+    if (!svg) return;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svg, 'image/svg+xml');
+      const svgEl = doc.documentElement;
+      const viewBox = svgEl.getAttribute('viewBox');
+      let width = 800; // fallback
+      if (viewBox) {
+        const parts = viewBox.split(/\s+/);
+        const w = parseFloat(parts[2]);
+        if (!isNaN(w)) width = w;
+      } else {
+        const widthAttr = svgEl.getAttribute('width');
+        if (widthAttr) {
+          const w = parseFloat(widthAttr);
+          if (!isNaN(w)) width = w;
+        }
+      }
+      setBaseWidth(width);
+
+      // Auto-fit inside main container
+      if (containerRef.current) {
+        const parentWidth = containerRef.current.clientWidth - 48; // container padding
+        if (parentWidth > 0 && width > parentWidth) {
+          const fitZoom = Math.max(0.1, Math.min(1, parentWidth / width));
+          setZoom(Math.round(fitZoom * 100) / 100);
+        } else {
+          setZoom(1.0);
+        }
+      }
+    } catch (e) {
+      console.error("[MermaidDiagram] Error parsing SVG width:", e);
+    }
+  }, [svg]);
+
+  // Recalculate zoom when entering fullscreen
+  useEffect(() => {
+    if (!isFullscreen || !svg || !baseWidth) return;
+    if (fullscreenContainerRef.current) {
+      const parentWidth = fullscreenContainerRef.current.clientWidth - 96; // fullscreen padding
+      if (parentWidth > 0 && baseWidth > parentWidth) {
+        const fitZoom = Math.max(0.1, Math.min(1, parentWidth / baseWidth));
+        setZoom(Math.round(fitZoom * 100) / 100);
+      } else {
+        setZoom(1.0);
+      }
+    }
+  }, [isFullscreen, svg, baseWidth]);
+
   useEffect(() => {
     let isMounted = true;
     let mermaidInstance = null;
 
     const attemptRender = async (chartCode, renderId) => {
-      // Re-initialize mermaid fresh for each attempt
       const mod = await import('mermaid');
       mermaidInstance = mod.default || mod;
       
@@ -232,17 +272,15 @@ export default function MermaidDiagram({ chart }) {
             setSvg(result);
             setRenderPass(i);
             setShowRawCode(false);
-            console.log(`[MermaidDiagram] ✅ Pass ${i} (${pass.name}) succeeded`);
-            return; // Success!
+            console.log(`[MermaidDiagram] Pass ${i} (${pass.name}) succeeded`);
+            return; 
           }
         } catch (err) {
-          console.warn(`[MermaidDiagram] ❌ Pass ${i} (${pass.name}) failed:`, err.message);
+          console.warn(`[MermaidDiagram] Pass ${i} (${pass.name}) failed:`, err.message);
           cleanupLeakedElements(rid);
-          // Continue to next pass
         }
       }
 
-      // All passes failed — show raw code
       if (isMounted) {
         console.warn('[MermaidDiagram] All passes failed. Showing raw code.');
         setShowRawCode(true);
@@ -256,10 +294,22 @@ export default function MermaidDiagram({ chart }) {
     };
   }, [chart, mermaidId]);
 
-  const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3.0));
-  const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.5));
-  const resetZoom = () => setZoom(1.0);
-  const toggleFullscreen = () => { setIsFullscreen(!isFullscreen); setZoom(1.0); };
+  const zoomIn = () => setZoom(prev => Math.min(prev + 0.1, 3.0));
+  const zoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.1));
+  const resetZoom = () => {
+    if (containerRef.current && baseWidth) {
+      const parentWidth = containerRef.current.clientWidth - 48;
+      if (parentWidth > 0 && baseWidth > parentWidth) {
+        const fitZoom = Math.max(0.1, Math.min(1, parentWidth / baseWidth));
+        setZoom(Math.round(fitZoom * 100) / 100);
+      } else {
+        setZoom(1.0);
+      }
+    } else {
+      setZoom(1.0);
+    }
+  };
+  const toggleFullscreen = () => { setIsFullscreen(!isFullscreen); };
 
   const downloadSVG = () => {
     if (!svg) return;
@@ -296,7 +346,6 @@ export default function MermaidDiagram({ chart }) {
     reader.readAsDataURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
   };
 
-  // ── Raw code fallback ────────────────────────────────────────
   if (showRawCode && !svg) {
     const rawCode = (chart || '').replace(/```mermaid\s*/gi, '').replace(/```/g, '').trim();
     return (
@@ -325,7 +374,6 @@ export default function MermaidDiagram({ chart }) {
     );
   }
 
-  // ── Loading ──────────────────────────────────────────────────
   if (!svg && !showRawCode) {
     return (
       <div style={{
@@ -344,7 +392,6 @@ export default function MermaidDiagram({ chart }) {
     );
   }
 
-  // ── Rendered SVG ─────────────────────────────────────────────
   const cardStyle = {
     border: '1px solid rgba(201, 168, 76, 0.15)', borderRadius: '12px',
     overflow: 'hidden', background: '#ffffff',
@@ -373,10 +420,37 @@ export default function MermaidDiagram({ chart }) {
 
   return (
     <>
+      <style>{`
+        .mermaid-scroll-container * {
+          color: #ffffff !important;
+          fill: #ffffff !important;
+        }
+        .mermaid-scroll-container svg {
+          width: 100% !important;
+          height: auto !important;
+          max-width: none !important;
+        }
+        .mermaid-scroll-container foreignObject div,
+        .mermaid-scroll-container foreignObject span,
+        .mermaid-scroll-container foreignObject p,
+        .mermaid-scroll-container foreignObject label,
+        .mermaid-scroll-container foreignObject * {
+          color: #ffffff !important;
+          background-color: transparent !important;
+        }
+        /* Style arrow labels on connections */
+        .mermaid-scroll-container .edgeLabel,
+        .mermaid-scroll-container .edgeLabel * {
+          color: #ffffff !important;
+          background-color: #0B1F3A !important;
+          fill: #ffffff !important;
+        }
+      `}</style>
+
       <div className="mermaid-wrapper" style={cardStyle}>
         <div className="mermaid-toolbar" style={toolbarStyle}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: '#0B1F3A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            ⚖️ Legal Process Flowchart
+            Legal Process Flowchart
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button onClick={zoomOut} style={buttonStyle} title="Zoom Out"><ZoomOut size={14} /></button>
@@ -388,13 +462,12 @@ export default function MermaidDiagram({ chart }) {
             <button onClick={toggleFullscreen} style={buttonStyle} title="Fullscreen"><Maximize2 size={14} /></button>
           </div>
         </div>
-        <div style={{ overflow: 'auto', padding: '24px', maxHeight: '500px', background: '#0B1F3A', borderRadius: '0 0 12px 12px' }}>
+        <div ref={containerRef} className="mermaid-scroll-container" style={{ overflow: 'auto', padding: '24px', maxHeight: '550px', background: '#0B1F3A', borderRadius: '0 0 12px 12px' }}>
           <div style={{
-            transformOrigin: 'top left',
-            transform: `scale(${zoom})`,
-            transition: 'transform 0.15s ease-out',
-            display: 'inline-block',
-            minWidth: 'max-content',
+            width: baseWidth ? `${baseWidth * zoom}px` : '100%',
+            margin: '0 auto',
+            display: 'block',
+            transition: 'width 0.15s ease-out',
           }}
             dangerouslySetInnerHTML={{ __html: svg }} />
         </div>
@@ -408,9 +481,9 @@ export default function MermaidDiagram({ chart }) {
         }}>
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '16px 32px', borderBottom: '1px solid rgba(201,168,76,0.2)'
+            padding: '16px 32px', borderBottom: '1px solid rgba(201, 168, 76, 0.2)'
           }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: '#C9A84C', fontWeight: '600' }}>⚖️ Interactive Flowchart Visualizer</h3>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#C9A84C', fontWeight: '600' }}>Interactive Flowchart Visualizer</h3>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={zoomOut} style={modalBtnStyle}><ZoomOut size={16} /> Zoom Out</button>
               <span style={{ fontSize: '14px', alignSelf: 'center', minWidth: '48px', textAlign: 'center', fontWeight: '600' }}>{Math.round(zoom * 100)}%</span>
@@ -421,14 +494,13 @@ export default function MermaidDiagram({ chart }) {
               <button onClick={toggleFullscreen} style={{ ...modalBtnStyle, background: '#ef4444', borderColor: '#ef4444' }}><X size={16} /> Close</button>
             </div>
           </div>
-          <div style={{ flex: 1, overflow: 'auto', padding: '48px', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start' }}>
+          <div ref={fullscreenContainerRef} className="mermaid-scroll-container" style={{ flex: 1, overflow: 'auto', padding: '48px', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start' }}>
             <div style={{
               background: '#0B1F3A', padding: '40px', borderRadius: '16px',
               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
-              display: 'inline-block', minWidth: 'max-content',
-              transformOrigin: 'top left',
-              transform: `scale(${zoom})`,
-              transition: 'transform 0.15s ease-out',
+              display: 'block',
+              width: baseWidth ? `${baseWidth * zoom}px` : '100%',
+              transition: 'width 0.15s ease-out',
             }} dangerouslySetInnerHTML={{ __html: svg }} />
           </div>
         </div>
