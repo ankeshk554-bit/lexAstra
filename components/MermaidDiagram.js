@@ -201,7 +201,7 @@ export default function MermaidDiagram({ chart }) {
           mainBkg: '#0B1F3A',
           nodeBorder: '#C9A84C',
         },
-        flowchart: { htmlLabels: true, useMaxWidth: true },
+        flowchart: { htmlLabels: true, useMaxWidth: false },
       });
 
       const { svg: result } = await mermaidInstance.render(renderId, chartCode);
@@ -388,8 +388,14 @@ export default function MermaidDiagram({ chart }) {
             <button onClick={toggleFullscreen} style={buttonStyle} title="Fullscreen"><Maximize2 size={14} /></button>
           </div>
         </div>
-        <div style={{ overflow: 'auto', padding: '24px', maxHeight: '400px', background: '#fff' }}>
-          <div style={{ width: `${zoom * 100}%`, margin: '0 auto', transition: 'width 0.15s ease-out' }}
+        <div style={{ overflow: 'auto', padding: '24px', maxHeight: '500px', background: '#0B1F3A', borderRadius: '0 0 12px 12px' }}>
+          <div style={{
+            transformOrigin: 'top left',
+            transform: `scale(${zoom})`,
+            transition: 'transform 0.15s ease-out',
+            display: 'inline-block',
+            minWidth: 'max-content',
+          }}
             dangerouslySetInnerHTML={{ __html: svg }} />
         </div>
       </div>
@@ -415,10 +421,14 @@ export default function MermaidDiagram({ chart }) {
               <button onClick={toggleFullscreen} style={{ ...modalBtnStyle, background: '#ef4444', borderColor: '#ef4444' }}><X size={16} /> Close</button>
             </div>
           </div>
-          <div style={{ flex: 1, overflow: 'auto', padding: '48px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ flex: 1, overflow: 'auto', padding: '48px', display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start' }}>
             <div style={{
-              width: `${zoom * 100}%`, background: '#fff', padding: '40px', borderRadius: '16px',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)', transition: 'width 0.15s ease-out'
+              background: '#0B1F3A', padding: '40px', borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)',
+              display: 'inline-block', minWidth: 'max-content',
+              transformOrigin: 'top left',
+              transform: `scale(${zoom})`,
+              transition: 'transform 0.15s ease-out',
             }} dangerouslySetInnerHTML={{ __html: svg }} />
           </div>
         </div>
