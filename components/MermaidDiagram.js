@@ -23,13 +23,27 @@ const sanitizeMermaidChart = (code) => {
     return clean.replace(/"/g, '\\"');
   };
   
-  // Fix reserved keyword 'end' used as node ID
-  sanitized = sanitized.replace(/\bend\s*(?=\(|\[|\{)/g, 'node_end');
-  // Match end word bounds as link targets
-  sanitized = sanitized.replace(/(-->|-.->|==>)\s*end\b/g, '$1 node_end');
-  // Match end word bounds as link sources
-  sanitized = sanitized.replace(/\bend\s*(?=-->|-.->|==>|--\s+)/g, 'node_end ');
-  
+  // Fix reserved keywords used as node IDs
+  const keywords = ['end', 'subgraph', 'click', 'style', 'classDef', 'class', 'linkStyle', 'direction'];
+  keywords.forEach(keyword => {
+    const keywordRegex = new RegExp('\\b' + keyword + '\\s*(?=\\(|\\(|\\[|\\{)', 'g');
+    sanitized = sanitized.replace(keywordRegex, 'node_' + keyword);
+    
+    const targetRegex = new RegExp('(-->|-.->|==>)\\s*' + keyword + '\\b', 'g');
+    sanitized = sanitized.replace(targetRegex, '$1 node_' + keyword);
+    
+    const sourceRegex = new RegExp('\\b' + keyword + '\\s*(?=-->|-.->|==>|--\\s+)', 'g');
+    sanitized = sanitized.replace(sourceRegex, 'node_' + keyword + ' ');
+  });
+
+  // Fix subgraph headers with spaces (e.g. subgraph Section 1) - strictly single line
+  sanitized = sanitized.replace(/^\s*subgraph\s+([^[\r\n"\s]+(?:[ \t]+[^[\r\n"]+)*)\s*$/gm, (match, title) => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle.includes(' ')) return match;
+    const safeId = 'sub_' + trimmedTitle.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    return `subgraph ${safeId} ["${trimmedTitle}"]`;
+  });
+
   // 2. Fix unquoted node labels for different shapes using robust matching:
   const quotedOrAny = '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"';
   
@@ -75,14 +89,18 @@ const sanitizeMermaidChart = (code) => {
     return `${arrow}|${cleanLabel}|`;
   });
   
-  // 4. Fix connection labels: A -- Yes --> B or A -- "Yes" --> B with potentially complex node shapes
-  // We normalize this to the standard node1 -- "label" --> node2 format
+  // 4. Fix connection labels: A -- Yes --> B, A == Yes ==> B, A -. Yes .-> B
+  // We normalize this to standard quoted connection formats. Run in a loop to handle overlapping matches on a single line.
   const nodePatternStr = `(?:[A-Za-z0-9_-]+(?:\\(\\(\\s*(?:${quotedOrAny}|(?:(?!\\)\\)).)*)\\s*\\)\\)|\\(\\s*(?:${quotedOrAny}|[^)\\n]*)\\s*\\)|\\[\\s*(?:${quotedOrAny}|[^\\]\\n]*)\\s*\\]|\\{\\{\\s*(?:${quotedOrAny}|(?:(?!\\}\\}\\}).)*)\\s*\\}\\}|\\{\\s*(?:${quotedOrAny}|[^}\\n]*)\\s*\\})?)`;
-  const connRegex = new RegExp('(' + nodePatternStr + ')\\s+--\\s+(.+?)\\s+-->\\s+(' + nodePatternStr + ')', 'g');
+  const connRegex = new RegExp('(' + nodePatternStr + ')\\s+(--|==|-\\.)\\s+(.+?)\\s+(-->|==>|\\.->)\\s+(' + nodePatternStr + ')', 'g');
   
-  sanitized = sanitized.replace(connRegex, (match, node1, label, node2) => {
-    return `${node1} -- "${sanitizeLabel(label)}" --> ${node2}`;
-  });
+  let prevSanitized;
+  do {
+    prevSanitized = sanitized;
+    sanitized = sanitized.replace(connRegex, (match, node1, arrowStart, label, arrowEnd, node2) => {
+      return `${node1} ${arrowStart} "${sanitizeLabel(label)}" ${arrowEnd} ${node2}`;
+    });
+  } while (sanitized !== prevSanitized);
 
   // 5. Ensure the chart starts with a valid diagram declaration keyword
   const lines = sanitized.split('\n');
