@@ -4621,7 +4621,6 @@ tr:hover .table-color-picker {
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
-  line-height: 1 !important; /* Fixes text selection overlapping extra lines */
 }
 
 .textLayer br {

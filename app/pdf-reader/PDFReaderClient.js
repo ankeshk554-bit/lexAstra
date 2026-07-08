@@ -485,18 +485,6 @@ export default function PDFReaderClient() {
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isDraftingNote, setIsDraftingNote] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
-  const [currentDocContext, setCurrentDocContext] = useState('');
-
-  // Live Context Tracker for Bare Acts
-  useEffect(() => {
-    const pt = pageTexts.find(p => p.pageNumber === currentPage);
-    if (pt && pt.text) {
-      const match = pt.text.match(/(?:Section|Article|Chapter|Part)\s+[0-9A-Z]+/i);
-      if (match) {
-        setCurrentDocContext(match[0]);
-      }
-    }
-  }, [currentPage, pageTexts]);
 
   // Refs
   const containerRef = useRef(null);
@@ -1424,39 +1412,63 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     runQuickQuery('explain');
   };
 
-  // local RAG Search context construction
+  // local RAG Search context construction for Legal Study
   const getRAGContext = (query) => {
     if (pageTexts.length === 0) return '';
     
-    // Simple Keyword TF Search
-    const words = query.toLowerCase().split(/\W+/).filter(w => w.length > 2);
-    if (words.length === 0) return '';
+    let targetPageNums = new Set();
+    const queryLower = query.toLowerCase();
+
+    // 1. Check for specific citations in query (e.g., "section 302", "article 14")
+    const sectionMatch = queryLower.match(/(?:section|sec\.|article|art\.|chapter|chap\.)\s*([0-9a-z]+)/);
     
-    const pageScores = pageTexts.map(pt => {
-      let score = 0;
-      const textLower = pt.text.toLowerCase();
-      words.forEach(word => {
-        const regex = new RegExp(`\\b${word}\\b`, 'g');
-        const matches = textLower.match(regex);
-        if (matches) {
-          score += matches.length;
-        }
-      });
-      return { ...pt, score };
-    });
-
-    const topPages = pageScores
-      .filter(p => p.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3); // Take top 3 pages
-
-    if (topPages.length === 0) {
-      // Fallback: Use current page
-      const fallbackPage = pageTexts.find(pt => pt.pageNumber === currentPage);
-      return fallbackPage ? `[Context from Current Page ${currentPage} of PDF]:\n${fallbackPage.text}\n` : '';
+    if (sectionMatch) {
+      // Find pages containing this section
+      const citation = sectionMatch[0];
+      const matchPages = pageTexts
+        .filter(pt => pt.text.toLowerCase().includes(citation))
+        .map(pt => pt.pageNumber);
+      
+      if (matchPages.length > 0) {
+        // Grab the first occurrence page and its adjacent page
+        const p = matchPages[0];
+        targetPageNums.add(p);
+        if (p < numPages) targetPageNums.add(p + 1);
+      }
     }
 
-    return topPages.map(p => `[Context from Page ${p.pageNumber} of PDF]:\n${p.text}\n`).join('\n');
+    // 2. If no specific citation found, fallback to current reading window
+    if (targetPageNums.size === 0) {
+      targetPageNums.add(currentPage);
+      if (currentPage > 1) targetPageNums.add(currentPage - 1);
+      if (currentPage < numPages) targetPageNums.add(currentPage + 1);
+    }
+
+    // 3. Optional keyword matching for highly unique words as a secondary layer
+    const rareWords = queryLower.split(/\W+/).filter(w => w.length > 5);
+    if (rareWords.length > 0 && targetPageNums.size < 3) {
+      pageTexts.forEach(pt => {
+        const textLower = pt.text.toLowerCase();
+        for (const word of rareWords) {
+          if (textLower.includes(word)) {
+            targetPageNums.add(pt.pageNumber);
+            break;
+          }
+        }
+      });
+    }
+
+    // Sort and limit to max 4 pages to avoid token limit overflow
+    const sortedPages = Array.from(targetPageNums)
+      .sort((a, b) => a - b)
+      .slice(0, 4);
+
+    return sortedPages
+      .map(pageNum => {
+        const pt = pageTexts.find(p => p.pageNumber === pageNum);
+        return pt ? `[Context from Page ${pageNum}]:\n${pt.text}\n` : '';
+      })
+      .join('\n');
   };
 
   const handleExamModeChange = (mode) => {
@@ -2456,32 +2468,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               </div>
             </header>
 
-            {/* Live Context Banner */}
-            {currentDocContext && (
-              <div style={{
-                position: 'absolute',
-                top: '52px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(8px)',
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderTop: 'none',
-                borderBottomLeftRadius: '8px',
-                borderBottomRightRadius: '8px',
-                padding: '4px 12px',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: 'var(--navy)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                zIndex: 10,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span style={{ color: 'var(--gold)' }}>📍</span> Currently viewing: {currentDocContext}
-              </div>
-            )}
+
 
             {/* Canvas + Text Layer Wrapper */}
             <div 
