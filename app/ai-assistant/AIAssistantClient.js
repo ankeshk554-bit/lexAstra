@@ -20,7 +20,7 @@ const getExamTagline = (mode) => {
     'CLAT PG': 'Analytical case-law focused responses',
     'CLAT UG': 'Simplified, scenario-based explanations',
     'AIBE': 'Section-focused, open-book optimized',
-    'APO': 'Prosecution-focused criminal law',
+    'APO': 'Section-centric, prosecution & Evidence Act ratio focused',
     'UGC NET Law': 'Academic, jurist-referenced analysis',
     'CUET PG Law': 'Conceptual distinctions & tables',
     'SEBI Legal': 'Corporate & securities regulation',
@@ -63,10 +63,10 @@ const getExamChips = (mode) => {
       "Which sections of CPC deal with temporary injunctions?"
     ],
     'APO': [
-      "Draw the complete FIR to Conviction flowchart under BNSS",
-      "Explain dying declaration under BSA with admissibility rules",
-      "Compare cognizable vs non-cognizable offences under BNS",
-      "What are the prosecution steps after chargesheet filing?"
+      "BPSC APO Quiz: Verify section definition clauses of IPC/BNS offences",
+      "Show dying declaration admissibility and Latin maxims (*Nemo moriturus*)",
+      "Analyze Section 27 Evidence Act (BSA Sec 23) discovery admissibility",
+      "Common intention vs Similar Intention case ratios (*Mahboob Shah*, *Barendra Ghosh*)"
     ],
     'UGC NET Law': [
       "Compare Austin's Command Theory with Hart's Rule of Recognition",

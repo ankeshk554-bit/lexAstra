@@ -306,7 +306,9 @@ const getExamPresets = (mode, currentPage) => {
     ],
     'APO': [
       { label: '👮 Prosecution Steps', prompt: `Explain the procedural steps a prosecution officer must take under BNSS/BNS/BSA regarding the matters on page ${currentPage}. Draw a sequence flowchart.`, title: 'Prosecution steps analysis' },
-      { label: '⛓️ Evidence Chain', prompt: `Detail the evidentiary requirements, admissibility standards, and burden of proof under BSA for the offences or issues mentioned on page ${currentPage}.`, title: 'Evidence chain analysis' }
+      { label: '⛓️ Evidence Chain', prompt: `Detail the evidentiary requirements, admissibility standards, and burden of proof under BSA for the offences or issues mentioned on page ${currentPage}.`, title: 'Evidence chain analysis' },
+      { label: '🔍 Definition & Section Quiz', prompt: `Based on page ${currentPage}, formulate 3 BPSC APO-style multiple-choice questions testing exact Section numbers, statutory definition clauses, or specific acts details (like who drafted it, or parts/chapters) under BNS, BNSS, and BSA (with IPC/CrPC/Evidence equivalents in parentheses). Provide answers with detailed reasons.`, title: 'APO Section & Definition Quiz' },
+      { label: '⚖️ Case Law & Ratios', prompt: `Formulate 2 mock questions based on the landmark case laws related to the concepts on page ${currentPage} (matching case names to ratios/subjects like Sarla Mudgal, RM Malkani, or Barendra Kumar Ghosh), and provide the model solution.`, title: 'APO Landmark Cases Quiz' }
     ],
     'UGC NET Law': [
       { label: '🎓 Theoretical Analysis', prompt: `Explain the theoretical underpinnings of the legal concepts on page ${currentPage}. Connect them to schools of jurisprudence (positivism, natural law, etc.) and cite relevant jurists.`, title: 'Academic theoretical analysis' },

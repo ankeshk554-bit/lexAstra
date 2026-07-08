@@ -215,8 +215,13 @@ export const exams = [
       }
     ],
     pyq: [
-      { year: 2022, state: 'UP', subject: 'Criminal Procedure', question: 'What are the powers of a police officer to arrest without a warrant under CrPC?', marks: 10 },
-      { year: 2021, state: 'Rajasthan', subject: 'Evidence', question: 'Discuss the evidentiary value of a confession made to a police officer.', marks: 10 }
+      { year: 2021, state: 'Bihar', subject: 'Substantive Criminal Law', question: 'In which Section of the Indian Penal Code, 1860 (and its corresponding BNS section) is the word "Act" defined? Explain the difference between single acts and series of acts.', marks: 5 },
+      { year: 2021, state: 'Bihar', subject: 'Substantive Criminal Law', question: 'Detail the statutory definition and key components of "wrongful restraint" (Section 339/341 IPC, corresponding to BNS). What is the punishment provided?', marks: 5 },
+      { year: 2021, state: 'Bihar', subject: 'Evidence', question: 'Discuss the admissibility of a dying declaration. What is the significance of the Latin maxim "Nemo moriturus praesumitur mentire" in this context?', marks: 10 },
+      { year: 2021, state: 'Bihar', subject: 'Evidence', question: 'Who drafted the Indian Evidence Act, 1872? Describe its general division into parts and chapters, and contrast it with the structure of the new Bharatiya Sakshya Adhiniyam (BSA), 2023.', marks: 10 },
+      { year: 2021, state: 'Bihar', subject: 'Substantive Criminal Law', question: 'Distinguish between "common intention" (Section 34 IPC / Section 3(5) BNS) and "similar intention" in light of landmark judgments such as Mahboob Shah v. King Emperor and Barendra Kumar Ghosh v. King Emperor.', marks: 15 },
+      { year: 2021, state: 'Bihar', subject: 'Substantive Criminal Law', question: 'Discuss the case of Sarla Mudgal, President of Kalyani v. Union of India. Which specific offence under the IPC/BNS does this case deal with?', marks: 10 },
+      { year: 2021, state: 'Bihar', subject: 'Evidence', question: 'Explain the admissibility of discovery statements under Section 27 of the Indian Evidence Act (Section 23 of BSA). What portions of information received from an accused are admissible?', marks: 15 }
     ],
     importantCases: ['dk-basu-v-state-of-west-bengal', 'lalita-kumari-v-govt-of-up', 'ar-antulay-v-rs-nayak'],
     lastUpdated: '2024-06-01'

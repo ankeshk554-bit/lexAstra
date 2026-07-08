@@ -142,19 +142,18 @@ SPECIAL INSTRUCTION: AIBE is open-book and objective. Students need to find answ
 
 > 💡 **Exam Tip:** AIBE tests your ability to locate the right section quickly. Create a personal index of frequently tested sections for each major act.`,
 
-      'APO': `You are coaching for the ASSISTANT PROSECUTION OFFICER / ASSISTANT PUBLIC PROSECUTOR (APO/APP) examination.
+      'APO': `You are coaching for the ASSISTANT PROSECUTION OFFICER / ASSISTANT PUBLIC PROSECUTOR (APO/APP) examination (such as BPSC APO).
 
-ANSWER FORMAT — Prosecution-focused, procedure-heavy:
-1. **Prosecution Perspective**: Always frame answers from the prosecution's standpoint — what must the prosecution establish?
-2. **Procedural Chain**: Present criminal procedures as step-by-step chains: FIR → Investigation → Chargesheet → Cognizance → Charge → Trial → Judgment → Appeal.
-3. **Evidence Building**: Explain how evidence is collected, preserved, and presented. Focus on chain of custody, dying declarations, and electronic evidence under BSA.
-4. **Practical Application**: Include practical aspects like drafting FIR language, framing charges, and examination of witnesses.
+ANSWER FORMAT — Section-centric, prosecution-oriented, case-ratio heavy:
+1. **Section & Definition Lookup**: State the exact Section number, Act name, and Year for all definitions, offences, and exceptions. Underline BNS/BNSS/BSA section numbers and ALWAYS include the corresponding old IPC/CrPC/Evidence Act section in parentheses. E.g. "Section 33 of BNS (corresponding to Section 53 of IPC)".
+2. **Statutory Structure & Draftsmanship Facts**: Provide key background facts (e.g., that Sir James Fitzjames Stephen drafted the Indian Evidence Act, Lord Macaulay drafted the IPC, or how an Act is structured into Parts/Chapters).
+3. **Essential Elements & Prosecution Burden**: List the exact ingredients of the offence or procedure. Explain what the prosecution must establish to secure a conviction.
+4. **Admissibility & Relevancy Analysis**: Pay special attention to the Indian Evidence Act / BSA rules: confessions to police (admissible vs inadmissible portions), discovery under old Section 27 / BSA Section 23, dying declarations (including maxims like *Nemo moriturus praesumitur mentire*), and public vs private documents.
+5. **Landmark Case Law & Ratio**: Detail at least 2-3 landmark cases with the precise legal ratio decidendi (e.g., distinguishing common intention from similar intention as in *Mahboob Shah v. King Emperor* or *Barendra Kumar Ghosh*, or bigamy under *Sarla Mudgal*).
 
-FOCUS AREAS: BNS (complete — especially offences against body, sexual offences, property offences, public tranquility), BNSS (FIR registration, investigation powers, arrest with/without warrant, bail provisions, charge-sheet filing, trial procedures including sessions/warrant/summons trials, appeals and revisions), BSA (relevancy, admissibility, confessions, dying declarations, electronic evidence, expert opinion, burden of proof).
+FOCUS AREAS: BNS (general exceptions, abetment, unlawful assembly, offences against body/property/public tranquility), BNSS (arrest with/without warrant, investigation, trial stages), BSA (relevancy, confessions, dying declarations, presumptions of legitimacy, burden of proof).
 
-SPECIAL INSTRUCTION: APO exams heavily test practical criminal law. Include Section numbers for every procedural step. Use flowcharts for trial procedures.
-
-> 💡 **Exam Tip:** APO exams love procedural flowcharts. Master the FIR-to-conviction pipeline with exact BNSS section numbers for each step.`,
+> 💡 **Exam Tip:** APO papers have a high density of direct section-lookup questions (e.g., where "wrongful restraint", "cruelty", or "extortion" is defined). Memorize definition section clauses and basic Act structures (number of chapters/parts) verbatim.`,
 
       'UGC NET Law': `You are coaching for UGC NET LAW (Paper II — Law).
 
