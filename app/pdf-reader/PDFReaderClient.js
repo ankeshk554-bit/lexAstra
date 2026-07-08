@@ -997,16 +997,45 @@ export default function PDFReaderClient() {
     const rects = activeRange.getClientRects();
     const normalizedRects = [];
 
-    // Save coords normalized by zoom so they resize with viewport
+    // Group rects by approximate line to fix fragmented PDF text layer rects
+    const lines = {};
     for (let i = 0; i < rects.length; i++) {
       const rect = rects[i];
-      normalizedRects.push({
-        left: (rect.left - textLayerRect.left) / zoom,
-        top: (rect.top - textLayerRect.top) / zoom,
-        width: rect.width / zoom,
-        height: rect.height / zoom
-      });
+      const nLeft = (rect.left - textLayerRect.left) / zoom;
+      const nTop = (rect.top - textLayerRect.top) / zoom;
+      const nWidth = rect.width / zoom;
+      const nHeight = rect.height / zoom;
+      
+      // Group by top position, rounded to nearest 4px to account for slight vertical variations
+      const lineKey = Math.round(nTop / 4) * 4;
+      if (!lines[lineKey]) lines[lineKey] = [];
+      lines[lineKey].push({ left: nLeft, top: nTop, width: nWidth, height: nHeight });
     }
+
+    // Merge rects on the same line that are close to each other
+    Object.keys(lines).forEach(key => {
+      // Sort left-to-right
+      const lineRects = lines[key].sort((a, b) => a.left - b.left);
+      let currentMerge = { ...lineRects[0] };
+      
+      for (let i = 1; i < lineRects.length; i++) {
+        const r = lineRects[i];
+        // If horizontal gap is small (e.g. less than 25px scaled), merge them to create a uniform block
+        const gap = r.left - (currentMerge.left + currentMerge.width);
+        if (gap < 25) {
+          const newRight = Math.max(currentMerge.left + currentMerge.width, r.left + r.width);
+          currentMerge.top = Math.min(currentMerge.top, r.top);
+          const maxBottom = Math.max(currentMerge.top + currentMerge.height, r.top + r.height);
+          
+          currentMerge.width = newRight - currentMerge.left;
+          currentMerge.height = maxBottom - currentMerge.top;
+        } else {
+          normalizedRects.push(currentMerge);
+          currentMerge = { ...r };
+        }
+      }
+      normalizedRects.push(currentMerge);
+    });
 
     const newAnnotation = {
       id: Math.random().toString(36).substring(7),
