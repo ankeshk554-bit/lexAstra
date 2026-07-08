@@ -461,6 +461,27 @@ export default function PDFReaderClient() {
     }
     return 'General';
   });
+
+  // Readability Document Themes
+  const [readerTheme, setReaderTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lexastra_reader_theme') || 'parchment';
+    }
+    return 'parchment';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lexastra_reader_theme', readerTheme);
+  }, [readerTheme]);
+
+  // Study Guide & Flashcard States
+  const [pageSummary, setPageSummary] = useState(null); // { page: number, summary: string }
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [flashcardDecks, setFlashcardDecks] = useState([]);
+  const [activeFlashcardIndex, setActiveFlashcardIndex] = useState(0);
+  const [isFlashcardFlipped, setIsFlashcardFlipped] = useState(false);
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
+  const [isDraftingNote, setIsDraftingNote] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
   // Refs
@@ -576,6 +597,7 @@ export default function PDFReaderClient() {
     // Load or reset annotations
     const key = fileName ? `lexastra_pdf_${fileName.replace(/\s+/g, '_')}` : '';
     let initialAnns = [];
+    let initialFlashcards = [];
     if (typeof window !== 'undefined' && key) {
       const storedAnns = localStorage.getItem(`${key}_anns`);
       if (storedAnns) {
@@ -583,8 +605,18 @@ export default function PDFReaderClient() {
           initialAnns = JSON.parse(storedAnns);
         } catch (e) {}
       }
+      const storedCards = localStorage.getItem(`${key}_flashcards`);
+      if (storedCards) {
+        try {
+          initialFlashcards = JSON.parse(storedCards);
+        } catch (e) {}
+      }
     }
     setAnnotations(initialAnns);
+    setFlashcardDecks(initialFlashcards);
+    setActiveFlashcardIndex(0);
+    setIsFlashcardFlipped(false);
+    setPageSummary(null);
 
     // Reset chat history for new document
     setChatHistory([
@@ -598,6 +630,13 @@ export default function PDFReaderClient() {
       localStorage.setItem(`${pdfKey}_anns`, JSON.stringify(annotations));
     }
   }, [annotations, pdfKey]);
+
+  // Persist flashcards to local storage
+  useEffect(() => {
+    if (pdfKey && flashcardDecks.length >= 0) {
+      localStorage.setItem(`${pdfKey}_flashcards`, JSON.stringify(flashcardDecks));
+    }
+  }, [flashcardDecks, pdfKey]);
 
   const handlePageVisible = useCallback((pageNumber) => {
     setCurrentPage(prev => {
@@ -1105,6 +1144,261 @@ export default function PDFReaderClient() {
     handleSendChat(prompt, 'selection', ann.text);
   };
 
+  const handleAiDraftNote = async (ann) => {
+    if (!ann || isDraftingNote) return;
+    setIsDraftingNote(true);
+    setTempNoteText('AI is summarizing text into study note...');
+    
+    try {
+      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (customKey) {
+        headers['x-api-key'] = customKey;
+      }
+
+      const promptMessages = [
+        {
+          role: 'system',
+          content: 'You are LexAstra AI, a helpful Indian law study companion. Provide a single, highly concise, 1-2 sentence study note explaining or summarizing the key legal concept, duty, exception, or principle in the highlighted text provided. Write only the note itself, structured for study references, without introductory phrases like "Here is a note".'
+        },
+        {
+          role: 'user',
+          content: `Highlighted Text:\n"${ann.text}"`
+        }
+      ];
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ messages: promptMessages, examMode }),
+      });
+
+      if (!response.ok) throw new Error('API request failed');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let draftedNote = '';
+      let buffer = '';
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataStr = trimmed.slice(6);
+              if (dataStr === '[DONE]') continue;
+              try {
+                const data = JSON.parse(dataStr);
+                const content = data.choices[0]?.delta?.content || '';
+                draftedNote += content;
+                setTempNoteText(draftedNote);
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error drafting note with AI:', error);
+      setTempNoteText('');
+      alert('Failed to draft study note with AI. Please check your API key configuration and network connection.');
+    } finally {
+      setIsDraftingNote(false);
+    }
+  };
+
+  const handleGeneratePageSummary = async () => {
+    const pageText = pageTexts.find(pt => pt.pageNumber === currentPage)?.text || '';
+    if (!pageText) {
+      alert('Page text is not indexed yet. Please wait a moment for the document to finish loading.');
+      return;
+    }
+    
+    setIsGeneratingSummary(true);
+    setPageSummary({ page: currentPage, summary: 'Generating summary...' });
+    
+    try {
+      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (customKey) {
+        headers['x-api-key'] = customKey;
+      }
+
+      const promptMessages = [
+        {
+          role: 'system',
+          content: `You are LexAstra AI, a specialized legal research assistant. Provide a highly structured, 3-bullet legal cheat sheet of the provided PDF page text.
+Identify:
+1. Key legal doctrines or principles discussed.
+2. Important statutory sections or articles cited.
+3. Relevant case laws and their simple ratio.
+
+Ensure it is concise, bulleted, and tailored to the ${examMode} exam requirements. Do not add conversational headers or intros.`
+        },
+        {
+          role: 'user',
+          content: `Page Text from Page ${currentPage}:\n"${pageText}"`
+        }
+      ];
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ messages: promptMessages, examMode }),
+      });
+
+      if (!response.ok) throw new Error('API request failed');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let summaryText = '';
+      let buffer = '';
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataStr = trimmed.slice(6);
+              if (dataStr === '[DONE]') continue;
+              try {
+                const data = JSON.parse(dataStr);
+                const content = data.choices[0]?.delta?.content || '';
+                summaryText += content;
+                setPageSummary({ page: currentPage, summary: summaryText });
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      setPageSummary(null);
+      alert('Failed to generate page summary. Please check your API key configuration and network connection.');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleGenerateFlashcards = async () => {
+    const pageText = pageTexts.find(pt => pt.pageNumber === currentPage)?.text || '';
+    if (!pageText) {
+      alert('Page text is not indexed yet. Please wait a moment for the document to finish loading.');
+      return;
+    }
+    
+    setIsGeneratingFlashcards(true);
+    setIsFlashcardFlipped(false);
+    
+    try {
+      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (customKey) {
+        headers['x-api-key'] = customKey;
+      }
+
+      const promptMessages = [
+        {
+          role: 'system',
+          content: `You are LexAstra AI, a legal study companion. Generate exactly 3 to 5 study flashcards based on the provided legal text from page ${currentPage}.
+Format your response as a valid JSON array of objects, where each object has "question" and "answer" properties.
+Keep questions focused on key definitions, section numbers, case names, maxims, or principles, and keep answers concise and easy to memorize.
+Example format:
+[
+  { "question": "What is the key principle in Kesavananda Bharati?", "answer": "The Basic Structure Doctrine, meaning Parliament cannot amend the basic structure of the Constitution." }
+]
+
+Do not return any markdown formatting, preambles, or explanations. Return ONLY the raw JSON array.`
+        },
+        {
+          role: 'user',
+          content: `Page Text:\n"${pageText}"`
+        }
+      ];
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ messages: promptMessages, examMode }),
+      });
+
+      if (!response.ok) throw new Error('API request failed');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let fullContent = '';
+      let buffer = '';
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataStr = trimmed.slice(6);
+              if (dataStr === '[DONE]') continue;
+              try {
+                const data = JSON.parse(dataStr);
+                const content = data.choices[0]?.delta?.content || '';
+                fullContent += content;
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+          }
+        }
+      }
+
+      let cleanedJson = fullContent.trim();
+      if (cleanedJson.startsWith('```')) {
+        cleanedJson = cleanedJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+      }
+
+      const parsedCards = JSON.parse(cleanedJson);
+      if (Array.isArray(parsedCards) && parsedCards.length > 0) {
+        setFlashcardDecks(parsedCards);
+        setActiveFlashcardIndex(0);
+      } else {
+        throw new Error('Response is not a valid flashcards array');
+      }
+
+    } catch (error) {
+      console.error('Error generating flashcards:', error);
+      alert('Failed to generate flashcards. Please check your API key configuration and try again.');
+    } finally {
+      setIsGeneratingFlashcards(false);
+    }
+  };
+
   const handleAskAISelection = () => {
     if (!selectedText || !selectionCoords) return;
     runQuickQuery('explain');
@@ -1475,14 +1769,20 @@ export default function PDFReaderClient() {
               className={`pdf-sidebar__tab ${activeTab === 'annotations' ? 'active' : ''}`}
               onClick={() => setActiveTab('annotations')}
             >
-              <Highlighter size={14} /> Notes ({annotations.length})
+              <Highlighter size={13} /> Notes ({annotations.length})
+            </button>
+            <button 
+              className={`pdf-sidebar__tab ${activeTab === 'study-guide' ? 'active' : ''}`}
+              onClick={() => setActiveTab('study-guide')}
+            >
+              <Sparkles size={13} /> Study Guide
             </button>
             <button 
               className={`pdf-sidebar__tab ${activeTab === 'outline' ? 'active' : ''}`}
               onClick={() => setActiveTab('outline')}
               disabled={outline.length === 0}
             >
-              <List size={14} /> Outline
+              <List size={13} /> Outline
             </button>
           </div>
           <button 
@@ -1582,6 +1882,201 @@ export default function PDFReaderClient() {
                   </div>
                 ))
               )}
+            </div>
+          ) : activeTab === 'study-guide' ? (
+            <div className="pdf-study-guide-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Part 1: Page Summary / Cheat Sheet */}
+              <div className="study-guide-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--navy)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📖 Page {currentPage} Cheat Sheet
+                </h4>
+                <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                  Generate a structured summary of the key principles, statutes, and cases on this page.
+                </p>
+                
+                {pageSummary && pageSummary.page === currentPage ? (
+                  <div className="study-guide-summary-box" style={{ background: '#ffffff', border: '1px solid var(--border-gold)', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#333', lineHeight: '1.6', position: 'relative' }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {pageSummary.summary}
+                    </ReactMarkdown>
+                    <button 
+                      onClick={() => setPageSummary(null)} 
+                      className="btn btn--ghost btn--small" 
+                      style={{ fontSize: '10px', padding: '2px 6px', marginTop: '8px', border: '1px solid rgba(0,0,0,0.1)' }}
+                    >
+                      Clear Summary
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleGeneratePageSummary} 
+                    className="btn btn--gold-fill btn--small"
+                    disabled={isGeneratingSummary}
+                    style={{ justifyContent: 'center' }}
+                  >
+                    {isGeneratingSummary ? 'Generating Cheat Sheet...' : 'Generate Cheat Sheet'}
+                  </button>
+                )}
+              </div>
+
+              <div className="menu-divider" style={{ background: 'rgba(0,0,0,0.06)' }} />
+
+              {/* Part 2: Interactive Flashcards */}
+              <div className="study-guide-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--navy)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🧠 AI Study Flashcards
+                </h4>
+                <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                  Create interactive flashcards based on the legal doctrines and sections on page {currentPage} to test your knowledge.
+                </p>
+
+                {flashcardDecks && flashcardDecks.length > 0 ? (
+                  <div className="flashcards-console" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+                    
+                    {/* 3D Flip Card */}
+                    <div 
+                      className="flashcard-container"
+                      onClick={() => setIsFlashcardFlipped(prev => !prev)}
+                      style={{
+                        width: '100%',
+                        height: '140px',
+                        cursor: 'pointer',
+                        perspective: '1000px'
+                      }}
+                    >
+                      <div 
+                        className={`flashcard-card ${isFlashcardFlipped ? 'flipped' : ''}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          position: 'relative',
+                          transformStyle: 'preserve-3d',
+                          transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                      >
+                        {/* Front Side */}
+                        <div 
+                          className="flashcard-front"
+                          style={{
+                            position: 'absolute',
+                            width: '100%',
+                            height: '100%',
+                            backfaceVisibility: 'hidden',
+                            background: '#ffffff',
+                            border: '1px solid var(--border-gold)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                            color: 'var(--navy)',
+                            fontWeight: '600',
+                            fontSize: '12.5px'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
+                            Question • Card {activeFlashcardIndex + 1}
+                          </span>
+                          <p style={{ margin: 0 }}>{flashcardDecks[activeFlashcardIndex]?.question}</p>
+                          <span style={{ fontSize: '9px', color: 'var(--gold-dark)', marginTop: '8px', opacity: 0.8 }}>
+                            Click to reveal answer 🔄
+                          </span>
+                        </div>
+
+                        {/* Back Side */}
+                        <div 
+                          className="flashcard-back"
+                          style={{
+                            position: 'absolute',
+                            width: '100%',
+                            height: '100%',
+                            backfaceVisibility: 'hidden',
+                            transform: 'rotateY(180deg)',
+                            background: 'var(--navy)',
+                            border: '1px solid var(--gold)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+                            color: '#ffffff',
+                            fontSize: '12px'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', letterSpacing: '0.05em', marginBottom: '8px', display: 'block' }}>
+                            Answer • Card {activeFlashcardIndex + 1}
+                          </span>
+                          <p style={{ margin: 0, lineHeight: '1.4' }}>{flashcardDecks[activeFlashcardIndex]?.answer}</p>
+                          <span style={{ fontSize: '9px', color: 'var(--gold)', marginTop: '8px', opacity: 0.8 }}>
+                            Click to view question 🔄
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Navigation Controls */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '4px' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFlashcardFlipped(false);
+                          setActiveFlashcardIndex(prev => Math.max(prev - 1, 0));
+                        }}
+                        className="btn btn--ghost btn--small"
+                        disabled={activeFlashcardIndex === 0}
+                        style={{ padding: '2px 8px' }}
+                      >
+                        ← Prev
+                      </button>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        {activeFlashcardIndex + 1} of {flashcardDecks.length}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFlashcardFlipped(false);
+                          setActiveFlashcardIndex(prev => Math.min(prev + 1, flashcardDecks.length - 1));
+                        }}
+                        className="btn btn--ghost btn--small"
+                        disabled={activeFlashcardIndex === flashcardDecks.length - 1}
+                        style={{ padding: '2px 8px' }}
+                      >
+                        Next →
+                      </button>
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        setFlashcardDecks([]);
+                        setActiveFlashcardIndex(0);
+                        setIsFlashcardFlipped(false);
+                        localStorage.removeItem(`lexastra_pdf_flashcards_${fileName.replace(/\s+/g, '_')}`);
+                      }} 
+                      className="btn btn--ghost btn--small"
+                      style={{ fontSize: '10.5px', color: 'var(--charcoal)', width: '100%', justifyContent: 'center', marginTop: '8px', border: '1px solid rgba(0,0,0,0.1)' }}
+                    >
+                      Clear Deck
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleGenerateFlashcards} 
+                    className="btn btn--gold-fill btn--small"
+                    disabled={isGeneratingFlashcards}
+                    style={{ justifyContent: 'center' }}
+                  >
+                    {isGeneratingFlashcards ? 'Generating Flashcards...' : 'Generate Flashcards'}
+                  </button>
+                )}
+              </div>
+
             </div>
           ) : (
             <div className="outline-list">
@@ -1873,6 +2368,38 @@ export default function PDFReaderClient() {
                 <button className="pdf-toolbar__btn" onClick={() => { setZoom(1.25); setFitMode('custom'); }} title="Reset Zoom">
                   <Maximize2 size={16} />
                 </button>
+                
+                <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+                
+                {/* Document Theme Selector */}
+                <div className="pdf-theme-selector-group" style={{ display: 'flex', alignItems: 'center', gap: '5px', paddingRight: '4px' }}>
+                  {[
+                    { id: 'light', name: 'Light', color: '#ffffff' },
+                    { id: 'parchment', name: 'Warm', color: '#f6f3eb' },
+                    { id: 'sepia', name: 'Sepia', color: '#f4ecd8' },
+                    { id: 'dark', name: 'Night', color: '#121824' }
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setReaderTheme(t.id)}
+                      className={`pdf-theme-btn-dot ${readerTheme === t.id ? 'active' : ''}`}
+                      title={`${t.name} Mode`}
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: t.color,
+                        border: readerTheme === t.id ? '2px solid var(--gold)' : '1px solid rgba(255,255,255,0.25)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        transition: 'all 0.2s ease',
+                        transform: readerTheme === t.id ? 'scale(1.2)' : 'none',
+                        boxShadow: readerTheme === t.id ? '0 0 6px var(--gold)' : 'none'
+                      }}
+                    />
+                  ))}
+                </div>
+
                 <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
                 <button className="pdf-toolbar__btn" onClick={handleFitWidth} title="Fit Page Width" style={{ display: 'flex', gap: '4px', padding: '4px 8px' }}>
                   <Maximize2 size={13} />
@@ -1911,7 +2438,7 @@ export default function PDFReaderClient() {
 
             {/* Canvas + Text Layer Wrapper */}
             <div 
-              className="pdf-render-scroll"
+              className={`pdf-render-scroll theme-${readerTheme}`}
               ref={containerRef}
               onMouseUp={handleTextSelection}
             >
@@ -2020,10 +2547,37 @@ export default function PDFReaderClient() {
                       <textarea
                         value={tempNoteText}
                         onChange={(e) => setTempNoteText(e.target.value)}
-                        placeholder="Add your study notes or questions..."
+                        placeholder={isDraftingNote ? "AI is drafting note..." : "Add your study notes or questions..."}
                         rows={3}
+                        disabled={isDraftingNote}
+                        style={{
+                          opacity: isDraftingNote ? 0.7 : 1,
+                          cursor: isDraftingNote ? 'wait' : 'text'
+                        }}
                       />
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                        <button 
+                          onClick={() => handleAiDraftNote(activeAnnotationMenu.ann)}
+                          className="action-btn"
+                          disabled={isDraftingNote}
+                          style={{ 
+                            padding: '3px 8px', 
+                            fontSize: '10.5px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '4px',
+                            background: 'rgba(201, 168, 76, 0.08)',
+                            border: '1px solid rgba(201, 168, 76, 0.2)',
+                            color: 'var(--gold-dark)',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            opacity: isDraftingNote ? 0.6 : 1
+                          }}
+                          title="Generate a concise AI study note for this highlighted text"
+                        >
+                          <Sparkles size={11} /> {isDraftingNote ? 'Drafting...' : 'AI Draft Note'}
+                        </button>
+                        
                         {activeAnnotationMenu.ann.comment !== tempNoteText && (
                           <button 
                             onClick={() => handleSaveNoteFromPopover(activeAnnotationMenu.ann.id)}
