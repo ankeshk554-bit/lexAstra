@@ -23,6 +23,13 @@ const sanitizeMermaidChart = (code) => {
     return clean.replace(/"/g, '\\"');
   };
   
+  // Fix reserved keyword 'end' used as node ID
+  sanitized = sanitized.replace(/\bend\s*(?=\(|\[|\{)/g, 'node_end');
+  // Match end word bounds as link targets
+  sanitized = sanitized.replace(/(-->|-.->|==>)\s*end\b/g, '$1 node_end');
+  // Match end word bounds as link sources
+  sanitized = sanitized.replace(/\bend\s*(?=-->|-.->|==>|--\s+)/g, 'node_end ');
+  
   // 2. Fix unquoted node labels for different shapes using robust matching:
   const quotedOrAny = '"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"';
   

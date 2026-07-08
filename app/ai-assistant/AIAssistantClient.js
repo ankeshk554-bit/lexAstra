@@ -274,6 +274,9 @@ export default function AIAssistantClient() {
       setTimeout(() => {
         const sendBtn = document.getElementById('ai-send-btn');
         if (sendBtn) sendBtn.click();
+        
+        // Clear url parameters to prevent re-triggering on HMR/reload
+        window.history.replaceState({}, document.title, window.location.pathname);
       }, 500);
     }
     
