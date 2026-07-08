@@ -7,7 +7,7 @@ import {
   BookOpen, Search, Copy, List, Maximize2, AlertCircle, FileText,
   Menu, X, Database, Folder, Plus, RefreshCw, Cloud, ArrowLeft,
   ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2, Download,
-  PanelLeftOpen, PanelLeftClose, Settings
+  PanelLeftOpen, PanelLeftClose, Settings, ChevronDown, ChevronUp
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -306,7 +306,6 @@ const getExamPresets = (mode, currentPage) => {
     ],
     'APO': [
       { label: '👮 Prosecution Steps', prompt: `Explain the procedural steps and burden of proof a prosecution officer must establish under the provisions on page ${currentPage}. Detail the evidentiary requirements.`, title: 'Prosecution steps analysis' },
-      { label: '⛓️ Charge Framing', prompt: `Based on the offences mentioned on page ${currentPage}, explain how charges would be framed in a trial court. What specific ingredients must the prosecution prove?`, title: 'Charge framing analysis' },
       { label: '🔍 BPSC APO MCQs', prompt: `Based on page ${currentPage}, formulate 5 BPSC APO-style multiple-choice questions testing exact Section numbers, statutory definition clauses, or specific acts details (with IPC/CrPC equivalents). Provide answers with detailed reasons.`, title: 'APO Section & Definition Quiz' },
       { label: '⚖️ Landmark Ratios', prompt: `Formulate 3 mock questions based on the landmark case laws related to the concepts on page ${currentPage}, focusing on matching case names to specific legal ratios or doctrines. Provide the model solution.`, title: 'APO Landmark Cases Quiz' }
     ],
@@ -485,6 +484,7 @@ export default function PDFReaderClient() {
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isDraftingNote, setIsDraftingNote] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [showPresets, setShowPresets] = useState(true);
 
   // Refs
   const containerRef = useRef(null);
@@ -1579,7 +1579,11 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     const payloadMessages = [
       {
         role: 'system',
-        content: `You are LexAstra AI, a specialized legal research assistant. The user is currently reading a document titled "${fileName}" and preparing for the ${examMode === 'General' ? 'General Law' : examMode} exam. Always prioritize information in the provided context (which is taken directly from their PDF) to answer their questions accurately. Quote specific pages and outline sections when referenced. Be precise, educational, and structured, tailoring your explanation style to the ${examMode} exam requirements.`
+        content: `You are LexAstra AI, a specialized legal research assistant. The user is currently reading a document titled "${fileName}" and preparing for the ${examMode === 'General' ? 'General Law' : examMode} exam. Always prioritize information in the provided context (which is taken directly from their PDF) to answer their questions accurately. Quote specific pages and outline sections when referenced. Be precise, educational, and structured, tailoring your explanation style to the ${examMode} exam requirements.
+        
+At the end of your response, ALWAYS provide 2-3 dynamic follow-up questions the user could ask next to deepen their understanding of this specific topic. Format them exactly like this on new lines at the very end of your message:
+[FOLLOWUP: What is the exception to this rule?]
+[FOLLOWUP: How does this apply to criminal cases?]`
       },
       ...updatedHistory.map(h => ({ role: h.role, content: h.role === 'user' ? contextPrompt + h.content : h.content }))
     ];
@@ -1709,6 +1713,18 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     return text.replace(/(?:\[\s*)?[Pp]age\s*-?\s*(\d+)(?:\s*\])?/g, (match, pageNum) => {
       return `[Page ${pageNum}](#page-${pageNum})`;
     });
+  };
+
+  const parseFollowUps = (text) => {
+    if (!text) return { cleanText: '', followUps: [] };
+    const followUps = [];
+    const regex = /\[FOLLOWUP:\s*(.*?)\]/gi;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      followUps.push(match[1].trim());
+    }
+    const cleanText = text.replace(/\[FOLLOWUP:\s*(.*?)\]/gi, '').trim();
+    return { cleanText, followUps };
   };
 
   // React Markdown component customization (including Mermaid support)
@@ -2895,7 +2911,10 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
           </header>
 
           <div className="pdf-chat-messages">
-            {chatHistory.map((msg, index) => (
+            {chatHistory.map((msg, index) => {
+              const parsed = msg.role === 'assistant' ? parseFollowUps(msg.content) : { cleanText: msg.content, followUps: [] };
+              
+              return (
               <div key={index} className={`chat-message-wrapper ${msg.role === 'user' ? 'chat-message-wrapper--user' : 'chat-message-wrapper--ai'}`}>
                 <div className="chat-message">
                   <div className="chat-message__avatar">
@@ -2905,7 +2924,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                     <div id={`pdf-ai-msg-${index}`}>
                       {/* Render Markdown Components with Mermaid support */}
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
-                        {msg.role === 'assistant' ? formatPageLinks(msg.content) : msg.content}
+                        {msg.role === 'assistant' ? formatPageLinks(parsed.cleanText) : parsed.cleanText}
                       </ReactMarkdown>
                     </div>
 
@@ -2920,7 +2939,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
                     {msg.role === 'assistant' && (
                       <div className="chat-msg-actions">
-                        <button onClick={() => handleCopyMessage(msg.content, index)} className="chat-msg-action-btn">
+                        <button onClick={() => handleCopyMessage(parsed.cleanText, index)} className="chat-msg-action-btn">
                           {copiedIndex === index ? <Check size={12} /> : <Copy size={12} />}
                           <span>{copiedIndex === index ? 'Copied' : 'Copy'}</span>
                         </button>
@@ -2932,10 +2951,27 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         )}
                       </div>
                     )}
+                    
+                    {parsed.followUps.length > 0 && index === chatHistory.length - 1 && !isChatLoading && (
+                      <div className="chat-msg-followups" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Suggested Follow-ups:</span>
+                        {parsed.followUps.map((f, i) => (
+                          <button 
+                            key={i} 
+                            onClick={() => handleSendChat(f, 'search')}
+                            className="chat-preset-btn"
+                            style={{ textAlign: 'left', whiteSpace: 'normal', height: 'auto', padding: '6px 10px', display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12px', border: '1px solid rgba(201, 168, 76, 0.3)', background: 'rgba(201, 168, 76, 0.05)', color: 'var(--navy)' }}
+                          >
+                            <Sparkles size={12} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--gold-main)' }} /> 
+                            <span>{f}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
             {isChatLoading && (
               <div className="chat-message-wrapper chat-message-wrapper--ai">
                 <div className="chat-message">
@@ -2994,20 +3030,32 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
             </div>
 
             <div className="chat-presets" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span className="context-label">Page Study Presets (Page {currentPage}):</span>
-              <div className="chat-presets-row" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-                {getExamPresets(examMode, currentPage).map((preset, pIdx) => (
-                  <button 
-                    key={pIdx}
-                    onClick={() => handleSendChat(preset.prompt, 'current')}
-                    className={`chat-preset-btn ${examMode !== 'General' ? 'exam-specific' : ''}`}
-                    disabled={isChatLoading || !pdfDocument}
-                    title={preset.title}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="context-label">Page Study Presets (Page {currentPage}):</span>
+                <button 
+                  onClick={() => setShowPresets(!showPresets)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                  title={showPresets ? "Hide Presets" : "Show Presets"}
+                >
+                  {showPresets ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  {showPresets ? 'Hide' : 'Show'}
+                </button>
               </div>
+              {showPresets && (
+                <div className="chat-presets-row" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+                  {getExamPresets(examMode, currentPage).map((preset, pIdx) => (
+                    <button 
+                      key={pIdx}
+                      onClick={() => handleSendChat(preset.prompt, 'current')}
+                      className={`chat-preset-btn ${examMode !== 'General' ? 'exam-specific' : ''}`}
+                      disabled={isChatLoading || !pdfDocument}
+                      title={preset.title}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="pdf-chat-input-wrapper">
