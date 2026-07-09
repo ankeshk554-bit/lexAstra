@@ -994,50 +994,26 @@ export default function PDFReaderClient() {
 
     const targetPage = selectionCoords.page;
     const textLayerRect = selectionCoords.textLayerRect;
-    const rawRects = Array.from(activeRange.getClientRects());
-    
-    // Perfect Highlighter Algorithm:
-    // Native selection generates full-width block rects and empty ghost rects.
-    // We fix this by clamping every native rect to the precise physical boundaries 
-    // of the actual text <span> elements it overlaps with.
+    // Ultimate PDF Highlighter Algorithm (Snap-to-Word):
+    // Native browser selection across absolute-positioned elements (PDF.js) creates huge ghost rects
+    // and full-width block selections for middle lines.
+    // We completely bypass the browser's native `range.getClientRects()` and instead extract the exact
+    // bounding boxes of the physical PDF.js text <span> elements that the user's selection touched.
     const textLayerNode = document.querySelector(`.pdf-page-container[data-page="${targetPage}"] .textLayer`);
     let rects = [];
     
     if (textLayerNode) {
+      // Find all text spans intersected by the selection range
       const selectedSpans = Array.from(textLayerNode.querySelectorAll('span')).filter(span => activeRange.intersectsNode(span));
       
-      for (const r of rawRects) {
-        // Find all spans that geometrically overlap with this native rect
-        const overlappingSpans = selectedSpans.filter(span => {
-          const s = span.getBoundingClientRect();
-          return !(r.right <= s.left || r.left >= s.right || r.bottom <= s.top || r.top >= s.bottom);
-        });
-        
-        // If it doesn't overlap with any text (i.e. ghost rect in margin), drop it entirely.
-        if (overlappingSpans.length === 0) continue;
-        
-        // Find the absolute text boundaries for these overlapping spans
-        const minSpanLeft = Math.min(...overlappingSpans.map(span => span.getBoundingClientRect().left));
-        const maxSpanRight = Math.max(...overlappingSpans.map(span => span.getBoundingClientRect().right));
-        
-        // Clamp the native rect to the precise text bounds.
-        const clampedLeft = Math.max(r.left, minSpanLeft);
-        const clampedRight = Math.min(r.right, maxSpanRight);
-        
-        rects.push({
-          left: clampedLeft,
-          right: clampedRight,
-          top: r.top,
-          bottom: r.bottom,
-          width: clampedRight - clampedLeft,
-          height: r.height
-        });
-      }
+      // Map them to their precise DOM rects. This guarantees the highlight perfectly hugs the text
+      // and creates a professional "snap-to-word" effect, entirely avoiding margin bleed.
+      rects = selectedSpans.map(span => span.getBoundingClientRect());
       
-      // Fallback
-      if (rects.length === 0) rects = rawRects;
+      // Fallback if no spans found
+      if (rects.length === 0) rects = Array.from(activeRange.getClientRects());
     } else {
-      rects = rawRects;
+      rects = Array.from(activeRange.getClientRects());
     }
     
     const normalizedRects = [];
