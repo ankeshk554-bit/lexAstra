@@ -996,27 +996,48 @@ export default function PDFReaderClient() {
     const textLayerRect = selectionCoords.textLayerRect;
     const rawRects = Array.from(activeRange.getClientRects());
     
-    // Bulletproof Ghost Rect Filter:
-    // Native selection generates empty "ghost rects" for line breaks and margins.
-    // Instead of guessing by width (which deletes full lines), we filter out any rect 
-    // that does not physically overlap with an actual text <span> element.
+    // Perfect Highlighter Algorithm:
+    // Native selection generates full-width block rects and empty ghost rects.
+    // We fix this by clamping every native rect to the precise physical boundaries 
+    // of the actual text <span> elements it overlaps with.
     const textLayerNode = document.querySelector(`.pdf-page-container[data-page="${targetPage}"] .textLayer`);
-    let rects = rawRects;
+    let rects = [];
     
     if (textLayerNode) {
       const selectedSpans = Array.from(textLayerNode.querySelectorAll('span')).filter(span => activeRange.intersectsNode(span));
       
-      rects = rawRects.filter(r => {
-        // Keep rect if it overlaps with at least one actual text span
-        return selectedSpans.some(span => {
+      for (const r of rawRects) {
+        // Find all spans that geometrically overlap with this native rect
+        const overlappingSpans = selectedSpans.filter(span => {
           const s = span.getBoundingClientRect();
-          // Check for geometric intersection (overlap)
           return !(r.right <= s.left || r.left >= s.right || r.bottom <= s.top || r.top >= s.bottom);
         });
-      });
+        
+        // If it doesn't overlap with any text (i.e. ghost rect in margin), drop it entirely.
+        if (overlappingSpans.length === 0) continue;
+        
+        // Find the absolute text boundaries for these overlapping spans
+        const minSpanLeft = Math.min(...overlappingSpans.map(span => span.getBoundingClientRect().left));
+        const maxSpanRight = Math.max(...overlappingSpans.map(span => span.getBoundingClientRect().right));
+        
+        // Clamp the native rect to the precise text bounds.
+        const clampedLeft = Math.max(r.left, minSpanLeft);
+        const clampedRight = Math.min(r.right, maxSpanRight);
+        
+        rects.push({
+          left: clampedLeft,
+          right: clampedRight,
+          top: r.top,
+          bottom: r.bottom,
+          width: clampedRight - clampedLeft,
+          height: r.height
+        });
+      }
       
-      // Fallback in case of weird browser behaviour
+      // Fallback
       if (rects.length === 0) rects = rawRects;
+    } else {
+      rects = rawRects;
     }
     
     const normalizedRects = [];
