@@ -225,7 +225,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
 [FOLLOWUP: How does this apply to criminal cases?]`;
 
     const payload = {
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-pro',
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages
