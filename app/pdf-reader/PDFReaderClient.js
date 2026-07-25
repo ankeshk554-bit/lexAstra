@@ -1588,17 +1588,14 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
       contextPrompt = getRAGContext(userMessage);
     }
 
-    const payloadMessages = [
-      {
-        role: 'system',
-        content: `You are LexAstra AI, a specialized legal research assistant. The user is currently reading a document titled "${fileName}" and preparing for the ${examMode === 'General' ? 'General Law' : examMode} exam. Always prioritize information in the provided context (which is taken directly from their PDF) to answer their questions accurately. Quote specific pages and outline sections when referenced. Be precise, educational, and structured, tailoring your explanation style to the ${examMode} exam requirements.
-        
-At the end of your response, ALWAYS provide 2-3 dynamic follow-up questions the user could ask next to deepen their understanding of this specific topic. Format them exactly like this on new lines at the very end of your message:
-[FOLLOWUP: What is the exception to this rule?]
-[FOLLOWUP: How does this apply to criminal cases?]`
-      },
-      ...updatedHistory.map(h => ({ role: h.role, content: h.role === 'user' ? contextPrompt + h.content : h.content }))
-    ];
+    const payloadMessages = updatedHistory.map((h, i) => {
+      // Only prepend the heavy contextPrompt to the LAST user message.
+      // Prepending it to all history wastes tokens and confuses the model.
+      if (i === updatedHistory.length - 1 && h.role === 'user') {
+        return { role: h.role, content: contextPrompt + h.content };
+      }
+      return { role: h.role, content: h.content };
+    });
 
     try {
       const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
@@ -1612,28 +1609,38 @@ At the end of your response, ALWAYS provide 2-3 dynamic follow-up questions the 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ messages: payloadMessages, examMode }),
+        body: JSON.stringify({ messages: payloadMessages, examMode, fileName }),
       });
 
       if (!response.ok) {
         setIsChatLoading(false);
         let errorMsg = `API request failed (Status: ${response.status}).`;
-        if (response.status === 400) {
-          errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
-        } else if (response.status === 401) {
-          errorMsg = 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the chat header.';
-        } else if (response.status === 402) {
-          errorMsg = 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the chat header.';
-        } else if (response.status === 403) {
-          errorMsg = 'Forbidden (Status 403). Access denied. Please ensure your API key has the correct permissions and your IP/region is allowed by DeepSeek.';
-        } else if (response.status === 429) {
-          errorMsg = 'Too Many Requests (Status 429). Rate limit exceeded. Please wait a moment before trying again.';
-        } else if (response.status >= 500) {
-          errorMsg = `Server Error (Status ${response.status}). The DeepSeek service might be experiencing temporary issues. Please try again later.`;
+        
+        try {
+          const errData = await response.json();
+          if (errData.details) {
+            errorMsg = `DeepSeek Error: ${errData.details}`;
+          } else if (response.status === 400) {
+            errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
+          } else if (response.status === 401) {
+            errorMsg = 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the chat header.';
+          } else if (response.status === 402) {
+            errorMsg = 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the chat header.';
+          } else if (response.status === 403) {
+            errorMsg = 'Forbidden (Status 403). Access denied. Please ensure your API key has the correct permissions and your IP/region is allowed by DeepSeek.';
+          } else if (response.status === 429) {
+            errorMsg = 'Too Many Requests (Status 429). Rate limit exceeded. Please wait a moment before trying again.';
+          } else if (response.status >= 500) {
+            errorMsg = `Server Error (Status ${response.status}). The DeepSeek service might be experiencing temporary issues. Please try again later.`;
+          }
+        } catch(e) {
+          if (response.status === 400) {
+            errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
+          }
         }
         
         const isKeyRelated = [400, 401, 402, 403].includes(response.status);
-        if (isKeyRelated && response.status !== 401 && response.status !== 402) {
+        if (isKeyRelated && response.status !== 401 && response.status !== 402 && !errorMsg.includes('DeepSeek Error:')) {
           errorMsg += ' You can update or clear your custom key via the **DeepSeek API Settings** in the chat header.';
         }
 

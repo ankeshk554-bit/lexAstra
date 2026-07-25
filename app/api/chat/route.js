@@ -57,7 +57,7 @@ Ground your answer in this actual syllabus scope — prioritize the subjects/top
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { messages, examMode = 'General' } = body;
+    const { messages, examMode = 'General', fileName = 'Document' } = body;
     
     const customApiKey = req.headers.get('x-api-key');
     const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
@@ -218,6 +218,12 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
       systemPrompt += `\n\nGENERAL MODE: Provide a balanced, thorough legal explanation. Follow structured output schema. Include citations, case law, and an exam tip.`;
     }
 
+    systemPrompt += `\n\nCONTEXT INFO: The user is currently reading a document titled "${fileName}". Always prioritize information in the provided context (which is taken directly from their PDF) to answer their questions accurately. Quote specific pages and outline sections when referenced.`;
+
+    systemPrompt += `\n\nAt the end of your response, ALWAYS provide 2-3 dynamic follow-up questions the user could ask next to deepen their understanding of this specific topic. Format them exactly like this on new lines at the very end of your message:
+[FOLLOWUP: What is the exception to this rule?]
+[FOLLOWUP: How does this apply to criminal cases?]`;
+
     const payload = {
       model: 'deepseek-chat',
       messages: [
@@ -242,7 +248,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
     if (!response.ok) {
       const errorText = await response.text();
       console.error('DeepSeek API Error:', errorText);
-      return new Response(JSON.stringify({ error: `DeepSeek API error: ${response.status}` }), {
+      return new Response(JSON.stringify({ error: `DeepSeek API error: ${response.status}`, details: errorText }), {
         status: response.status,
         headers: { 'Content-Type': 'application/json' }
       });
