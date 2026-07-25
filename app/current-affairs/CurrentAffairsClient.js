@@ -8,6 +8,13 @@ export default function CurrentAffairsClient({ articles }) {
 
   const categories = ['All', 'Supreme Court', 'Parliament', 'New Legislation', 'Constitutional Developments', 'International Law'];
 
+  // This page is a curated static digest, not a live feed. Compute the most
+  // recent update date so students know exactly how current the list is,
+  // instead of assuming everything below is today's news.
+  const mostRecentUpdate = articles.reduce((latest, a) => {
+    return a.lastUpdated && a.lastUpdated > latest ? a.lastUpdated : latest;
+  }, '');
+
   const filteredArticles = articles.filter(
     (article) => activeCategory === 'All' || article.category === activeCategory
   );
@@ -23,6 +30,21 @@ export default function CurrentAffairsClient({ articles }) {
 
       <section className="section">
         <div className="container">
+          {mostRecentUpdate && (
+            <div
+              style={{
+                background: 'rgba(201,168,76,0.1)',
+                border: '1px solid var(--gold)',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                marginBottom: 'var(--space-lg)',
+                fontSize: '13px',
+                color: 'var(--navy)'
+              }}
+            >
+              📌 This is a curated digest, last synced <strong>{mostRecentUpdate}</strong>. For anything more recent, verify against official sources (SCI website, Gazette of India, PRS Legislative Research).
+            </div>
+          )}
           <FilterTabs tabs={categories} activeTab={activeCategory} onTabChange={setActiveCategory} />
           
           {filteredArticles.length === 0 ? (

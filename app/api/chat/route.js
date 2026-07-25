@@ -1,4 +1,58 @@
+import { exams } from '@/data/exams';
+
 export const dynamic = 'force-dynamic';
+
+// Maps the chat's exam-mode labels (shown in the UI dropdown) to the
+// corresponding entry in data/exams.js, so the AI can be grounded in the
+// *actual* syllabus/topics/cases for that exam, not just a style directive.
+const EXAM_MODE_TO_SLUG = {
+  'Judiciary': 'judiciary',
+  'CLAT PG': 'clat-pg',
+  'CLAT UG': 'clat-ug',
+  'CUET UG': 'cuet-ug',
+  'AIBE': 'aibe',
+  'APO': 'apo',
+  'UGC NET Law': 'ugc-net-law',
+  'CUET PG Law': 'cuet-pg',
+  'SEBI Legal': 'sebi-legal',
+  'UPSC Law Optional': 'upsc-law-optional',
+  'IBPS SO Law': 'ibps-so-law',
+};
+
+// Builds a compact, token-efficient briefing from the structured exam data
+// (syllabus subjects/topics, important cases, a sample PYQ) so the model's
+// answer is actually anchored to what that exam tests, not just styled like it.
+function buildExamContext(examMode) {
+  const slug = EXAM_MODE_TO_SLUG[examMode];
+  if (!slug) return '';
+
+  const exam = exams.find((e) => e.slug === slug);
+  if (!exam) return '';
+
+  const subjectLines = exam.syllabus
+    .flatMap((paper) => paper.subjects)
+    .slice(0, 8)
+    .map((subj) => `- ${subj.name}: ${subj.topics.slice(0, 6).join(', ')}`)
+    .join('\n');
+
+  const caseLine = exam.importantCases && exam.importantCases.length > 0
+    ? `Important cases frequently tested: ${exam.importantCases.slice(0, 6).map(c => c.replace(/-/g, ' ')).join(', ')}.`
+    : '';
+
+  const pyqExample = exam.pyq && exam.pyq.length > 0
+    ? `Sample PYQ style (${exam.pyq[0].year}, ${exam.pyq[0].marks} marks): "${exam.pyq[0].question}"`
+    : '';
+
+  return `
+
+REAL SYLLABUS CONTEXT FOR ${exam.name.toUpperCase()} (${exam.fullName}):
+Exam pattern: ${exam.pattern.stages.join(' → ')}.
+Core subjects & topics actually tested:
+${subjectLines}
+${caseLine}
+${pyqExample}
+Ground your answer in this actual syllabus scope — prioritize the subjects/topics listed above over generic legal knowledge, and prefer the listed cases when relevant.`;
+}
 
 export async function POST(req) {
   try {
@@ -6,10 +60,15 @@ export async function POST(req) {
     const { messages, examMode = 'General' } = body;
     
     const customApiKey = req.headers.get('x-api-key');
-    const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY || 'sk-b787a477759c4cf58c764b5c843afbbe';
+    const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API key not configured' }), { 
+      // No hardcoded fallback key: server operators must set DEEPSEEK_API_KEY
+      // in their environment (.env.local, hosting provider secrets, etc.),
+      // or the user must supply their own key via DeepSeek API Settings.
+      return new Response(JSON.stringify({
+        error: 'API key not configured. Set the DEEPSEEK_API_KEY environment variable on the server, or add your own key via DeepSeek API Settings in the sidebar.'
+      }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -68,6 +127,14 @@ Format:
 5. Critique: Discuss dissents, alternatives.
 Focus: Constitutional Law (recent SC), Jurisprudence (jurists), Admin, International.
 > 💡 Exam Tip: Deep knowledge > breadth. Know 50 cases perfectly. Always state ratio.`,
+
+      'CUET UG': `CUET UG (LAW):
+Format:
+1. Definition: Precise NCERT/CBSE Class XII legal-studies definition.
+2. Application: Short scenario applying the concept.
+3. MCQ Points: Discrete, testable factual statements.
+Focus: Judiciary basics, branches of law, ADR, human rights, legal profession, legal services. Keep it exam-board simple — this is a school-leaving-level domain test, not an LLB-level analysis.
+> 💡 Exam Tip: Stick close to the NCERT Legal Studies textbook framing; avoid over-complicating answers.`,
 
       'CLAT UG': `CLAT UG:
 Format:
@@ -146,6 +213,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
 
     if (examMode !== 'General' && examPrompts[examMode]) {
       systemPrompt += `\n\nEXAM-SPECIFIC COACHING INSTRUCTIONS:\n${examPrompts[examMode]}`;
+      systemPrompt += buildExamContext(examMode);
     } else {
       systemPrompt += `\n\nGENERAL MODE: Provide a balanced, thorough legal explanation. Follow structured output schema. Include citations, case law, and an exam tip.`;
     }

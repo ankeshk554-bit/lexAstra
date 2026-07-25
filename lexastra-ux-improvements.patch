@@ -1,0 +1,567 @@
+diff --git a/app/ai-assistant/AIAssistantClient.js b/app/ai-assistant/AIAssistantClient.js
+index bcf739d..b46d51b 100644
+--- a/app/ai-assistant/AIAssistantClient.js
++++ b/app/ai-assistant/AIAssistantClient.js
+@@ -10,6 +10,22 @@ import MermaidDiagram from '@/components/MermaidDiagram';
+ // Utility to generate a simple UUID
+ const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+ 
++// Maps data/exams.js slugs (used in URLs like /exams/clat-pg) to the chat's
++// exam-mode labels, so links from an exam's page can pre-select the right mode.
++const SLUG_TO_EXAM_MODE = {
++  'judiciary': 'Judiciary',
++  'clat-pg': 'CLAT PG',
++  'clat-ug': 'CLAT UG',
++  'cuet-ug': 'CUET UG',
++  'aibe': 'AIBE',
++  'apo': 'APO',
++  'ugc-net-law': 'UGC NET Law',
++  'cuet-pg': 'CUET PG Law',
++  'sebi-legal': 'SEBI Legal',
++  'upsc-law-optional': 'UPSC Law Optional',
++  'ibps-so-law': 'IBPS SO Law',
++};
++
+ // Helper to satisfy React 19 linter rules for purity during static analysis
+ const getTimestamp = () => Date.now();
+ 
+@@ -19,6 +35,7 @@ const getExamTagline = (mode) => {
+     'Judiciary': 'Mains-style structured answer format',
+     'CLAT PG': 'Analytical case-law focused responses',
+     'CLAT UG': 'Simplified, scenario-based explanations',
++    'CUET UG': 'NCERT-style definitions for school-leaving level',
+     'AIBE': 'Section-focused, open-book optimized',
+     'APO': 'Section-centric, prosecution & Evidence Act ratio focused',
+     'UGC NET Law': 'Academic, jurist-referenced analysis',
+@@ -56,6 +73,12 @@ const getExamChips = (mode) => {
+       "Difference between bail and bond in simple terms",
+       "What is the rule of law? Explain with examples"
+     ],
++    'CUET UG': [
++      "What is the difference between civil law and criminal law?",
++      "Explain the structure of the Indian judiciary in brief",
++      "What is Alternative Dispute Resolution (ADR)?",
++      "Define human rights with one Indian example"
++    ],
+     'AIBE': [
+       "Quick reference: Which section covers cheque dishonour?",
+       "List all sections on bail under BNSS with section numbers",
+@@ -266,6 +289,17 @@ export default function AIAssistantClient() {
+     document.body.classList.add('full-screen-page');
+ 
+     const params = new URLSearchParams(window.location.search);
++
++    // If we arrived via a deep link that specifies an exam (e.g. the
++    // "Ask AI for Model Answer" button on an exam's PYQ page), switch to
++    // that exam mode automatically so the answer is properly grounded.
++    const examSlug = params.get('exam');
++    if (examSlug && SLUG_TO_EXAM_MODE[examSlug]) {
++      const mode = SLUG_TO_EXAM_MODE[examSlug];
++      setExamMode(mode);
++      localStorage.setItem('lexastra_exam_mode', mode);
++    }
++
+     const initialPrompt = params.get('prompt');
+     if (initialPrompt) {
+       setTimeout(() => {
+@@ -879,6 +913,7 @@ export default function AIAssistantClient() {
+                 <option value="Judiciary">State Judiciary (Civil Judge)</option>
+                 <option value="CLAT PG">CLAT PG (LLM)</option>
+                 <option value="CLAT UG">CLAT UG (LLB)</option>
++                <option value="CUET UG">CUET UG (Law)</option>
+                 <option value="AIBE">AIBE (Bar Exam)</option>
+                 <option value="APO">APO / APP (Prosecution)</option>
+                 <option value="UGC NET Law">UGC NET Law</option>
+@@ -1183,7 +1218,7 @@ export default function AIAssistantClient() {
+               Create Local Profile
+             </h3>
+             <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
+-              Enter your name or email to sync your textbook highlights, notes, and AI conversations locally.
++              Enter your name or email to label your textbook highlights, notes, and AI conversations. These are saved only in this browser — they won&rsquo;t follow you to another device, and clearing your browser data will erase them.
+             </p>
+             
+             <form onSubmit={(e) => {
+diff --git a/app/api/chat/route.js b/app/api/chat/route.js
+index 6795f61..176fd77 100644
+--- a/app/api/chat/route.js
++++ b/app/api/chat/route.js
+@@ -1,15 +1,74 @@
++import { exams } from '@/data/exams';
++
+ export const dynamic = 'force-dynamic';
+ 
++// Maps the chat's exam-mode labels (shown in the UI dropdown) to the
++// corresponding entry in data/exams.js, so the AI can be grounded in the
++// *actual* syllabus/topics/cases for that exam, not just a style directive.
++const EXAM_MODE_TO_SLUG = {
++  'Judiciary': 'judiciary',
++  'CLAT PG': 'clat-pg',
++  'CLAT UG': 'clat-ug',
++  'CUET UG': 'cuet-ug',
++  'AIBE': 'aibe',
++  'APO': 'apo',
++  'UGC NET Law': 'ugc-net-law',
++  'CUET PG Law': 'cuet-pg',
++  'SEBI Legal': 'sebi-legal',
++  'UPSC Law Optional': 'upsc-law-optional',
++  'IBPS SO Law': 'ibps-so-law',
++};
++
++// Builds a compact, token-efficient briefing from the structured exam data
++// (syllabus subjects/topics, important cases, a sample PYQ) so the model's
++// answer is actually anchored to what that exam tests, not just styled like it.
++function buildExamContext(examMode) {
++  const slug = EXAM_MODE_TO_SLUG[examMode];
++  if (!slug) return '';
++
++  const exam = exams.find((e) => e.slug === slug);
++  if (!exam) return '';
++
++  const subjectLines = exam.syllabus
++    .flatMap((paper) => paper.subjects)
++    .slice(0, 8)
++    .map((subj) => `- ${subj.name}: ${subj.topics.slice(0, 6).join(', ')}`)
++    .join('\n');
++
++  const caseLine = exam.importantCases && exam.importantCases.length > 0
++    ? `Important cases frequently tested: ${exam.importantCases.slice(0, 6).map(c => c.replace(/-/g, ' ')).join(', ')}.`
++    : '';
++
++  const pyqExample = exam.pyq && exam.pyq.length > 0
++    ? `Sample PYQ style (${exam.pyq[0].year}, ${exam.pyq[0].marks} marks): "${exam.pyq[0].question}"`
++    : '';
++
++  return `
++
++REAL SYLLABUS CONTEXT FOR ${exam.name.toUpperCase()} (${exam.fullName}):
++Exam pattern: ${exam.pattern.stages.join(' → ')}.
++Core subjects & topics actually tested:
++${subjectLines}
++${caseLine}
++${pyqExample}
++Ground your answer in this actual syllabus scope — prioritize the subjects/topics listed above over generic legal knowledge, and prefer the listed cases when relevant.`;
++}
++
+ export async function POST(req) {
+   try {
+     const body = await req.json();
+     const { messages, examMode = 'General' } = body;
+     
+     const customApiKey = req.headers.get('x-api-key');
+-    const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY || 'sk-b787a477759c4cf58c764b5c843afbbe';
++    const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
+ 
+     if (!apiKey) {
+-      return new Response(JSON.stringify({ error: 'API key not configured' }), { 
++      // No hardcoded fallback key: server operators must set DEEPSEEK_API_KEY
++      // in their environment (.env.local, hosting provider secrets, etc.),
++      // or the user must supply their own key via DeepSeek API Settings.
++      return new Response(JSON.stringify({
++        error: 'API key not configured. Set the DEEPSEEK_API_KEY environment variable on the server, or add your own key via DeepSeek API Settings in the sidebar.'
++      }), {
+         status: 401,
+         headers: { 'Content-Type': 'application/json' }
+       });
+@@ -69,6 +128,14 @@ Format:
+ Focus: Constitutional Law (recent SC), Jurisprudence (jurists), Admin, International.
+ > 💡 Exam Tip: Deep knowledge > breadth. Know 50 cases perfectly. Always state ratio.`,
+ 
++      'CUET UG': `CUET UG (LAW):
++Format:
++1. Definition: Precise NCERT/CBSE Class XII legal-studies definition.
++2. Application: Short scenario applying the concept.
++3. MCQ Points: Discrete, testable factual statements.
++Focus: Judiciary basics, branches of law, ADR, human rights, legal profession, legal services. Keep it exam-board simple — this is a school-leaving-level domain test, not an LLB-level analysis.
++> 💡 Exam Tip: Stick close to the NCERT Legal Studies textbook framing; avoid over-complicating answers.`,
++
+       'CLAT UG': `CLAT UG:
+ Format:
+ 1. Principle: 1-2 simple sentences.
+@@ -146,6 +213,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
+ 
+     if (examMode !== 'General' && examPrompts[examMode]) {
+       systemPrompt += `\n\nEXAM-SPECIFIC COACHING INSTRUCTIONS:\n${examPrompts[examMode]}`;
++      systemPrompt += buildExamContext(examMode);
+     } else {
+       systemPrompt += `\n\nGENERAL MODE: Provide a balanced, thorough legal explanation. Follow structured output schema. Include citations, case law, and an exam tip.`;
+     }
+diff --git a/app/current-affairs/CurrentAffairsClient.js b/app/current-affairs/CurrentAffairsClient.js
+index 9c84617..e55a335 100644
+--- a/app/current-affairs/CurrentAffairsClient.js
++++ b/app/current-affairs/CurrentAffairsClient.js
+@@ -8,6 +8,13 @@ export default function CurrentAffairsClient({ articles }) {
+ 
+   const categories = ['All', 'Supreme Court', 'Parliament', 'New Legislation', 'Constitutional Developments', 'International Law'];
+ 
++  // This page is a curated static digest, not a live feed. Compute the most
++  // recent update date so students know exactly how current the list is,
++  // instead of assuming everything below is today's news.
++  const mostRecentUpdate = articles.reduce((latest, a) => {
++    return a.lastUpdated && a.lastUpdated > latest ? a.lastUpdated : latest;
++  }, '');
++
+   const filteredArticles = articles.filter(
+     (article) => activeCategory === 'All' || article.category === activeCategory
+   );
+@@ -23,6 +30,21 @@ export default function CurrentAffairsClient({ articles }) {
+ 
+       <section className="section">
+         <div className="container">
++          {mostRecentUpdate && (
++            <div
++              style={{
++                background: 'rgba(201,168,76,0.1)',
++                border: '1px solid var(--gold)',
++                borderRadius: '8px',
++                padding: '10px 16px',
++                marginBottom: 'var(--space-lg)',
++                fontSize: '13px',
++                color: 'var(--navy)'
++              }}
++            >
++              📌 This is a curated digest, last synced <strong>{mostRecentUpdate}</strong>. For anything more recent, verify against official sources (SCI website, Gazette of India, PRS Legislative Research).
++            </div>
++          )}
+           <FilterTabs tabs={categories} activeTab={activeCategory} onTabChange={setActiveCategory} />
+           
+           {filteredArticles.length === 0 ? (
+diff --git a/app/exams/[slug]/ExamDetailClient.js b/app/exams/[slug]/ExamDetailClient.js
+index 38eee08..e697c89 100644
+--- a/app/exams/[slug]/ExamDetailClient.js
++++ b/app/exams/[slug]/ExamDetailClient.js
+@@ -34,7 +34,10 @@ export default function ExamDetailClient({ exam }) {
+               </div>
+               <p className="pyq-card__question">{q.question}</p>
+               <div style={{ marginTop: '16px' }}>
+-                <Link href="/ai-assistant" className="btn btn--ghost btn--small">
++                <Link
++                  href={`/ai-assistant?exam=${encodeURIComponent(exam.slug)}&prompt=${encodeURIComponent(`Write a model answer for this ${exam.name} question: ${q.question}`)}`}
++                  className="btn btn--ghost btn--small"
++                >
+                   ✦ Ask AI for Model Answer
+                 </Link>
+               </div>
+diff --git a/components/Navbar.js b/components/Navbar.js
+index 429aecf..6d9b8bc 100644
+--- a/components/Navbar.js
++++ b/components/Navbar.js
+@@ -270,7 +270,7 @@ export default function Navbar() {
+               Create Local Profile
+             </h3>
+             <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
+-              Enter your name or email to sync your textbook highlights, notes, and AI conversations locally.
++              Enter your name or email to label your textbook highlights, notes, and AI conversations. These are saved only in this browser — they won&rsquo;t follow you to another device, and clearing your browser data will erase them.
+             </p>
+             
+             <form onSubmit={handleSignInSubmit}>
+diff --git a/data/exams.js b/data/exams.js
+index 2c70dca..835f337 100644
+--- a/data/exams.js
++++ b/data/exams.js
+@@ -295,5 +295,306 @@ export const exams = [
+     ],
+     importantCases: ['kesavananda-bharati', 'maneka-gandhi'],
+     lastUpdated: '2024-06-01'
++  },
++  {
++    id: 'aibe',
++    slug: 'aibe',
++    name: 'AIBE',
++    fullName: 'All India Bar Examination',
++    description: 'Open-book certification exam conducted by the Bar Council of India that law graduates must clear to receive a Certificate of Practice and practice as an advocate in India.',
++    eligibility: 'LLB degree from a BCI-recognized university and provisional enrollment with a State Bar Council.',
++    pattern: {
++      stages: ['Single Objective Paper (Open Book)'],
++      details: '100 multiple-choice questions across core and allied laws, to be answered in 3.5 hours. Bare Acts and printed material are allowed on the desk. Qualifying exam (no ranking); passing percentage is fixed by BCI for the relevant cycle.'
++    },
++    keyDates: {
++      notification: 'Cycle-based, usually 1-2 sittings per year',
++      exam: 'Announced by BCI per cycle'
++    },
++    majorStates: ['All India'],
++    syllabus: [
++      {
++        paper: 'AIBE Paper',
++        subjects: [
++          {
++            name: 'Code of Civil Procedure, 1908',
++            topics: ['Jurisdiction', 'Res Judicata', 'Pleadings', 'Execution', 'Appeals and Revisions', 'Interim Orders'],
++            relatedActs: ['code-of-civil-procedure'],
++            relatedCases: []
++          },
++          {
++            name: 'Indian Penal Code, 1860 / BNS 2023',
++            topics: ['General Exceptions', 'Offences against the Body', 'Offences against Property', 'Punishments'],
++            relatedActs: ['indian-penal-code', 'bharatiya-nyaya-sanhita'],
++            relatedCases: []
++          },
++          {
++            name: 'Code of Criminal Procedure, 1973 / BNSS 2023',
++            topics: ['FIR and Investigation', 'Arrest and Bail', 'Cognizable vs Non-Cognizable Offences', 'Trial Procedure'],
++            relatedActs: ['code-of-criminal-procedure', 'bharatiya-nagarik-suraksha-sanhita'],
++            relatedCases: []
++          },
++          {
++            name: 'Indian Evidence Act, 1872 / BSA 2023',
++            topics: ['Relevancy of Facts', 'Confessions', 'Burden of Proof', 'Documentary Evidence'],
++            relatedActs: ['indian-evidence-act', 'bharatiya-sakshya-adhiniyam'],
++            relatedCases: []
++          },
++          {
++            name: 'Indian Contract Act, 1872',
++            topics: ['Essentials of a Valid Contract', 'Breach of Contract', 'Indemnity and Guarantee', 'Bailment and Agency'],
++            relatedActs: ['indian-contract-act'],
++            relatedCases: []
++          },
++          {
++            name: 'Constitution of India',
++            topics: ['Fundamental Rights', 'Writ Jurisdiction', 'Directive Principles', 'Union and State Legislature'],
++            relatedActs: ['constitution-of-india'],
++            relatedCases: []
++          },
++          {
++            name: 'Professional Ethics & Bar Council Rules',
++            topics: ['Advocates Act, 1961', 'BCI Rules of Professional Conduct', 'Contempt of Courts Act', 'Misconduct and Disciplinary Proceedings'],
++            relatedActs: [],
++            relatedCases: []
++          }
++        ]
++      }
++    ],
++    pyq: [
++      { year: 2023, state: 'All India', subject: 'Civil Procedure', question: 'Under which Order and Rule of the CPC is a plaint rejected for want of cause of action?', marks: 1 },
++      { year: 2023, state: 'All India', subject: 'Evidence', question: 'Which section of the Evidence Act deals with the relevancy of a dying declaration?', marks: 1 }
++    ],
++    importantCases: [],
++    lastUpdated: '2024-06-01'
++  },
++  {
++    id: 'ugc-net-law',
++    slug: 'ugc-net-law',
++    name: 'UGC NET Law',
++    fullName: 'National Eligibility Test (NET) — Law',
++    description: 'Test conducted by NTA on behalf of UGC to determine eligibility for Assistant Professor positions (and, subject to score, Junior Research Fellowship) in Law at Indian universities and colleges.',
++    eligibility: "Master's degree (LLM) or equivalent from a recognized university with the prescribed minimum aggregate marks (relaxation for reserved categories as per UGC norms).",
++    pattern: {
++      stages: ['Paper I (Teaching & Research Aptitude)', 'Paper II (Law — Subject Specific)'],
++      details: 'Both papers are objective (MCQ), computer-based, held on the same day. Paper I is general and common to all subjects; Paper II tests law-specific knowledge across jurisprudence, constitutional law, and allied subjects.'
++    },
++    keyDates: {
++      notification: 'Cycles are typically announced twice a year',
++      exam: 'NTA-notified dates per cycle'
++    },
++    majorStates: ['All India'],
++    syllabus: [
++      {
++        paper: 'Paper II — Law',
++        subjects: [
++          {
++            name: 'Jurisprudence',
++            topics: ['Schools of Jurisprudence (Analytical, Historical, Sociological, Natural Law)', 'Austin, Kelsen, Hart, Salmond', 'Concept of Rights and Duties', 'Sources of Law'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'Constitutional Law of India',
++            topics: ['Fundamental Rights and Directive Principles', 'Centre-State Relations', 'Judicial Review', 'Constitutional Amendments'],
++            relatedActs: ['constitution-of-india'],
++            relatedCases: ['kesavananda-bharati', 'maneka-gandhi']
++          },
++          {
++            name: 'Law of Crimes',
++            topics: ['General Principles of Criminal Liability', 'Offences under IPC/BNS', 'Criminal Procedure Fundamentals'],
++            relatedActs: ['indian-penal-code', 'bharatiya-nyaya-sanhita'],
++            relatedCases: []
++          },
++          {
++            name: 'International Law',
++            topics: ['Sources of International Law', 'State Recognition', 'UN Charter', 'International Humanitarian Law'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'Family Law, Labour Law & Environmental Law',
++            topics: ['Hindu and Muslim Personal Law', 'Industrial Disputes Act', 'Environment Protection Act', 'Public Interest Litigation on Environment'],
++            relatedActs: [],
++            relatedCases: []
++          }
++        ]
++      }
++    ],
++    pyq: [
++      { year: 2023, state: 'All India', subject: 'Jurisprudence', question: "Explain Hart's concept of the 'Rule of Recognition' and how it differs from Austin's Command Theory.", marks: 2 }
++    ],
++    importantCases: ['kesavananda-bharati', 'maneka-gandhi'],
++    lastUpdated: '2024-06-01'
++  },
++  {
++    id: 'sebi-legal',
++    slug: 'sebi-legal',
++    name: 'SEBI Legal',
++    fullName: 'SEBI Grade A Officer — Legal Stream',
++    description: 'Recruitment examination conducted by the Securities and Exchange Board of India for Assistant Manager (Legal) posts, testing securities law, corporate regulation, and general legal knowledge.',
++    eligibility: 'LLB degree from a recognized university, meeting the age and marks criteria specified in the relevant year\'s SEBI notification.',
++    pattern: {
++      stages: ['Phase I (Objective — General + Legal)', 'Phase II (Descriptive Legal Paper + English)', 'Interview'],
++      details: 'Phase I screens on general awareness, quantitative aptitude, English, and legal aptitude/knowledge. Phase II tests in-depth knowledge of securities and corporate law through descriptive answers plus an English writing component.'
++    },
++    keyDates: {
++      notification: 'Typically released early in the calendar year',
++      exam: 'SEBI-notified dates per recruitment cycle'
++    },
++    majorStates: ['All India'],
++    syllabus: [
++      {
++        paper: 'Legal Stream Paper',
++        subjects: [
++          {
++            name: 'SEBI Act, 1992 & Regulations',
++            topics: ['Powers and Functions of SEBI', 'SEBI (LODR) Regulations', 'SEBI (PIT) Regulations — Insider Trading', 'SEBI (SAST) Regulations — Takeovers'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'Companies Act, 2013',
++            topics: ['Incorporation and Corporate Governance', 'Directors\' Duties', 'Oppression and Mismanagement', 'Winding Up Provisions'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'Securities Contracts (Regulation) Act & Depositories Act',
++            topics: ['Recognition of Stock Exchanges', 'Dematerialisation of Securities', 'Role of Depositories and DPs'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'IBC 2016 & FEMA',
++            topics: ['Corporate Insolvency Resolution Process (CIRP)', 'Liquidation', 'Foreign Investment Regulations under FEMA'],
++            relatedActs: [],
++            relatedCases: []
++          }
++        ]
++      }
++    ],
++    pyq: [
++      { year: 2022, state: 'All India', subject: 'Securities Law', question: 'Discuss the powers of SEBI under Sections 11 and 11B of the SEBI Act, 1992 to protect investor interests.', marks: 10 }
++    ],
++    importantCases: [],
++    lastUpdated: '2024-06-01'
++  },
++  {
++    id: 'upsc-law-optional',
++    slug: 'upsc-law-optional',
++    name: 'UPSC Law Optional',
++    fullName: 'Civil Services (Main) Examination — Law Optional Subject',
++    description: 'An optional subject within the UPSC Civil Services Mains examination, chosen mainly by law graduates, covering constitutional/administrative law, international law, crimes, torts, and mercantile law across two descriptive papers.',
++    eligibility: 'Must first qualify UPSC Civil Services Preliminary Examination; any graduate is eligible to select Law as an optional subject for Mains.',
++    pattern: {
++      stages: ['Prelims (General Studies + CSAT)', 'Mains (Optional Paper I & II, 250 marks each)', 'Interview'],
++      details: 'Both optional papers are long-form descriptive/analytical answers, testing depth, contemporary awareness, and the ability to connect legal doctrine to governance and policy.'
++    },
++    keyDates: {
++      notification: 'Usually February',
++      exam: 'Prelims around June, Mains around September'
++    },
++    majorStates: ['All India'],
++    syllabus: [
++      {
++        paper: 'Law Optional Paper I',
++        subjects: [
++          {
++            name: 'Constitutional and Administrative Law',
++            topics: ['Preamble and Basic Structure', 'Fundamental Rights and DPSPs', 'Emergency Provisions', 'Delegated Legislation', 'Administrative Tribunals'],
++            relatedActs: ['constitution-of-india'],
++            relatedCases: ['kesavananda-bharati', 'maneka-gandhi']
++          },
++          {
++            name: 'International Law',
++            topics: ['Sources and Subjects of International Law', 'UN and its Organs', 'Law of the Sea', 'International Humanitarian and Human Rights Law'],
++            relatedActs: [],
++            relatedCases: []
++          }
++        ]
++      },
++      {
++        paper: 'Law Optional Paper II',
++        subjects: [
++          {
++            name: 'Law of Crimes',
++            topics: ['General Principles of Criminal Liability under IPC/BNS', 'Offences against the State, Body and Property'],
++            relatedActs: ['indian-penal-code', 'bharatiya-nyaya-sanhita'],
++            relatedCases: []
++          },
++          {
++            name: 'Law of Torts and Consumer Protection',
++            topics: ['General Principles of Tortious Liability', 'Strict and Absolute Liability', 'Consumer Protection Act'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'Law of Contracts and Mercantile Law',
++            topics: ['Formation and Discharge of Contracts', 'Sale of Goods Act', 'Negotiable Instruments Act', 'Arbitration and Conciliation Act'],
++            relatedActs: ['indian-contract-act'],
++            relatedCases: []
++          }
++        ]
++      }
++    ],
++    pyq: [
++      { year: 2022, state: 'All India', subject: 'Constitutional Law', question: 'Critically examine the doctrine of Basic Structure and its evolution since Kesavananda Bharati.', marks: 20 }
++    ],
++    importantCases: ['kesavananda-bharati', 'maneka-gandhi'],
++    lastUpdated: '2024-06-01'
++  },
++  {
++    id: 'ibps-so-law',
++    slug: 'ibps-so-law',
++    name: 'IBPS SO Law',
++    fullName: 'IBPS Specialist Officer — Law Officer',
++    description: 'Recruitment examination conducted by IBPS for Law Officer posts in participating Public Sector Banks, testing knowledge of banking-related legislation alongside general and professional knowledge.',
++    eligibility: 'LLB degree and enrollment as an advocate with a Bar Council, along with any prior experience requirement specified in the year\'s notification.',
++    pattern: {
++      stages: ['Online Preliminary Exam', 'Online Main Exam (Professional Knowledge)', 'Interview'],
++      details: 'Prelims covers reasoning, English, and quantitative aptitude (qualifying in nature). Mains has a dedicated Professional Knowledge (Law) paper focused on banking, recovery, and commercial legislation.'
++    },
++    keyDates: {
++      notification: 'Usually released towards the end of the calendar year',
++      exam: 'IBPS-notified dates per cycle'
++    },
++    majorStates: ['All India'],
++    syllabus: [
++      {
++        paper: 'Professional Knowledge — Law',
++        subjects: [
++          {
++            name: 'Banking Regulation Act & RBI Act',
++            topics: ['Licensing and Regulation of Banks', 'RBI Powers and Directions', 'NPA Classification'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'Negotiable Instruments Act, 1881',
++            topics: ['Cheques and Dishonour (Section 138)', 'Promissory Notes and Bills of Exchange', 'Holder in Due Course'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'SARFAESI Act & RDDBFI Act',
++            topics: ['Securitisation and Asset Reconstruction', 'DRT Procedure', 'Enforcement of Security Interest without Court Intervention'],
++            relatedActs: [],
++            relatedCases: []
++          },
++          {
++            name: 'IBC 2016 & PMLA',
++            topics: ['Corporate Insolvency Resolution Process', 'Role of NCLT', 'Money Laundering Offences and Attachment'],
++            relatedActs: [],
++            relatedCases: []
++          }
++        ]
++      }
++    ],
++    pyq: [
++      { year: 2022, state: 'All India', subject: 'Banking Law', question: 'Explain the procedure for enforcement of security interest under Section 13 of the SARFAESI Act, 2002.', marks: 5 }
++    ],
++    importantCases: [],
++    lastUpdated: '2024-06-01'
+   }
+ ];

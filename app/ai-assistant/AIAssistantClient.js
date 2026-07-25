@@ -10,6 +10,22 @@ import MermaidDiagram from '@/components/MermaidDiagram';
 // Utility to generate a simple UUID
 const generateId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
+// Maps data/exams.js slugs (used in URLs like /exams/clat-pg) to the chat's
+// exam-mode labels, so links from an exam's page can pre-select the right mode.
+const SLUG_TO_EXAM_MODE = {
+  'judiciary': 'Judiciary',
+  'clat-pg': 'CLAT PG',
+  'clat-ug': 'CLAT UG',
+  'cuet-ug': 'CUET UG',
+  'aibe': 'AIBE',
+  'apo': 'APO',
+  'ugc-net-law': 'UGC NET Law',
+  'cuet-pg': 'CUET PG Law',
+  'sebi-legal': 'SEBI Legal',
+  'upsc-law-optional': 'UPSC Law Optional',
+  'ibps-so-law': 'IBPS SO Law',
+};
+
 // Helper to satisfy React 19 linter rules for purity during static analysis
 const getTimestamp = () => Date.now();
 
@@ -19,6 +35,7 @@ const getExamTagline = (mode) => {
     'Judiciary': 'Mains-style structured answer format',
     'CLAT PG': 'Analytical case-law focused responses',
     'CLAT UG': 'Simplified, scenario-based explanations',
+    'CUET UG': 'NCERT-style definitions for school-leaving level',
     'AIBE': 'Section-focused, open-book optimized',
     'APO': 'Section-centric, prosecution & Evidence Act ratio focused',
     'UGC NET Law': 'Academic, jurist-referenced analysis',
@@ -55,6 +72,12 @@ const getExamChips = (mode) => {
       "What are Fundamental Rights? Explain for a beginner",
       "Difference between bail and bond in simple terms",
       "What is the rule of law? Explain with examples"
+    ],
+    'CUET UG': [
+      "What is the difference between civil law and criminal law?",
+      "Explain the structure of the Indian judiciary in brief",
+      "What is Alternative Dispute Resolution (ADR)?",
+      "Define human rights with one Indian example"
     ],
     'AIBE': [
       "Quick reference: Which section covers cheque dishonour?",
@@ -266,6 +289,17 @@ export default function AIAssistantClient() {
     document.body.classList.add('full-screen-page');
 
     const params = new URLSearchParams(window.location.search);
+
+    // If we arrived via a deep link that specifies an exam (e.g. the
+    // "Ask AI for Model Answer" button on an exam's PYQ page), switch to
+    // that exam mode automatically so the answer is properly grounded.
+    const examSlug = params.get('exam');
+    if (examSlug && SLUG_TO_EXAM_MODE[examSlug]) {
+      const mode = SLUG_TO_EXAM_MODE[examSlug];
+      setExamMode(mode);
+      localStorage.setItem('lexastra_exam_mode', mode);
+    }
+
     const initialPrompt = params.get('prompt');
     if (initialPrompt) {
       setTimeout(() => {
@@ -879,6 +913,7 @@ export default function AIAssistantClient() {
                 <option value="Judiciary">State Judiciary (Civil Judge)</option>
                 <option value="CLAT PG">CLAT PG (LLM)</option>
                 <option value="CLAT UG">CLAT UG (LLB)</option>
+                <option value="CUET UG">CUET UG (Law)</option>
                 <option value="AIBE">AIBE (Bar Exam)</option>
                 <option value="APO">APO / APP (Prosecution)</option>
                 <option value="UGC NET Law">UGC NET Law</option>
@@ -1183,7 +1218,7 @@ export default function AIAssistantClient() {
               Create Local Profile
             </h3>
             <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
-              Enter your name or email to sync your textbook highlights, notes, and AI conversations locally.
+              Enter your name or email to label your textbook highlights, notes, and AI conversations. These are saved only in this browser — they won&rsquo;t follow you to another device, and clearing your browser data will erase them.
             </p>
             
             <form onSubmit={(e) => {

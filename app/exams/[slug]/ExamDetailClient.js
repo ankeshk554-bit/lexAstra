@@ -34,7 +34,10 @@ export default function ExamDetailClient({ exam }) {
               </div>
               <p className="pyq-card__question">{q.question}</p>
               <div style={{ marginTop: '16px' }}>
-                <Link href="/ai-assistant" className="btn btn--ghost btn--small">
+                <Link
+                  href={`/ai-assistant?exam=${encodeURIComponent(exam.slug)}&prompt=${encodeURIComponent(`Write a model answer for this ${exam.name} question: ${q.question}`)}`}
+                  className="btn btn--ghost btn--small"
+                >
                   ✦ Ask AI for Model Answer
                 </Link>
               </div>

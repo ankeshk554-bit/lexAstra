@@ -270,7 +270,7 @@ export default function Navbar() {
               Create Local Profile
             </h3>
             <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
-              Enter your name or email to sync your textbook highlights, notes, and AI conversations locally.
+              Enter your name or email to label your textbook highlights, notes, and AI conversations. These are saved only in this browser — they won&rsquo;t follow you to another device, and clearing your browser data will erase them.
             </p>
             
             <form onSubmit={handleSignInSubmit}>
