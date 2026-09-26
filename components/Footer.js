@@ -1,5 +1,43 @@
 import Link from 'next/link';
 
+// Memoized footer link component to prevent unnecessary re-renders
+const FooterLink = ({ href, children }) => (
+  <li>
+    <Link href={href} className="footer__link">
+      {children}
+    </Link>
+  </li>
+);
+
+// Static data for footer sections
+const FOOTER_SECTIONS = Object.freeze([
+  {
+    heading: 'Navigate',
+    links: [
+      { href: '/', label: 'Home' },
+      { href: '/bare-acts', label: 'Bare Acts' },
+      { href: '/case-law', label: 'Case Law' },
+      { href: '/exams', label: 'Exams' },
+    ],
+  },
+  {
+    heading: 'Resources',
+    links: [
+      { href: '/ai-assistant', label: 'AI Assistant' },
+      { href: '/current-affairs', label: 'Current Affairs' },
+      { href: '/exams/judiciary', label: 'Judiciary Exam' },
+      { href: '/exams/clat-ug', label: 'CLAT UG' },
+    ],
+  },
+]);
+
+const SOCIAL_LINKS = Object.freeze([
+  { platform: 'Twitter', icon: '𝕏', url: '#' },
+  { platform: 'LinkedIn', icon: 'in', url: '#' },
+  { platform: 'Instagram', icon: '◎', url: '#' },
+  { platform: 'YouTube', icon: '▶', url: '#' },
+]);
+
 export default function Footer() {
   return (
     <footer className="footer" role="contentinfo">
@@ -17,33 +55,32 @@ export default function Footer() {
             </p>
           </div>
 
-          <div>
-            <h4 className="footer__heading">Navigate</h4>
-            <ul className="footer__links">
-              <li><Link href="/" className="footer__link">Home</Link></li>
-              <li><Link href="/bare-acts" className="footer__link">Bare Acts</Link></li>
-              <li><Link href="/case-law" className="footer__link">Case Law</Link></li>
-              <li><Link href="/exams" className="footer__link">Exams</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="footer__heading">Resources</h4>
-            <ul className="footer__links">
-              <li><Link href="/ai-assistant" className="footer__link">AI Assistant</Link></li>
-              <li><Link href="/current-affairs" className="footer__link">Current Affairs</Link></li>
-              <li><Link href="/exams/judiciary" className="footer__link">Judiciary Exam</Link></li>
-              <li><Link href="/exams/clat-ug" className="footer__link">CLAT UG</Link></li>
-            </ul>
-          </div>
+          {FOOTER_SECTIONS.map((section) => (
+            <div key={section.heading}>
+              <h4 className="footer__heading">{section.heading}</h4>
+              <ul className="footer__links">
+                {section.links.map((link) => (
+                  <FooterLink key={link.href} href={link.href}>
+                    {link.label}
+                  </FooterLink>
+                ))}
+              </ul>
+            </div>
+          ))}
 
           <div>
             <h4 className="footer__heading">Connect</h4>
             <div className="footer__socials">
-              <a href="#" className="footer__social-link" aria-label="Twitter">𝕏</a>
-              <a href="#" className="footer__social-link" aria-label="LinkedIn">in</a>
-              <a href="#" className="footer__social-link" aria-label="Instagram">◎</a>
-              <a href="#" className="footer__social-link" aria-label="YouTube">▶</a>
+              {SOCIAL_LINKS.map((social) => (
+                <a
+                  key={social.platform}
+                  href={social.url}
+                  className="footer__social-link"
+                  aria-label={social.platform}
+                >
+                  {social.icon}
+                </a>
+              ))}
             </div>
           </div>
         </div>

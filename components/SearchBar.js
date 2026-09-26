@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Fuse from 'fuse.js';
 
 export default function SearchBar({ data, keys, onResults, placeholder = 'Search...' }) {
   const [query, setQuery] = useState('');
 
+  // Memoize Fuse instance to prevent re-creation on every render
   const fuse = useMemo(() => {
     return new Fuse(data, {
       keys: keys,
@@ -13,19 +14,22 @@ export default function SearchBar({ data, keys, onResults, placeholder = 'Search
       includeScore: true,
       includeMatches: true,
       ignoreFieldNorm: true,
+      minMatchCharLength: 2, // Optimize: don't search for single characters
     });
   }, [data, keys]);
 
-  const handleChange = (e) => {
+  // Memoize change handler to prevent unnecessary re-renders
+  const handleChange = useCallback((e) => {
     const value = e.target.value;
     setQuery(value);
+    
     if (value.trim()) {
       const results = fuse.search(value);
       onResults(results.map((r) => r.item));
     } else {
       onResults(null); // null = show all
     }
-  };
+  }, [fuse, onResults]);
 
   return (
     <div className="search-bar">
