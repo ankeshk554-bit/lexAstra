@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LexAstra
 
-## Getting Started
+An Indian law study workspace: searchable statutes and case summaries, exam
+syllabus checklists, a local PDF library with annotations, and an AI assistant.
 
-First, run the development server:
+## Development
 
-```bash
+Use Node.js 22.13 or newer (Node 24 recommended), then:
+
+```sh
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+In this cloud environment, use `npm ci --cache /workspace/.npm-cache` if the
+default npm cache is not writable. Use the existing checkout; a worktree is not
+required. The PDF engine and worker are bundled locally and do not require a CDN.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## AI configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set `DEEPSEEK_API_KEY` securely in the server environment or in an ignored
+`.env.local`, then restart the server. You can also enter a personal key through
+the assistant's API settings. Personal keys are stored on that browser; avoid
+shared devices. Keys are excluded from workspace backups.
 
-## Learn More
+`DEEPSEEK_MODEL` optionally selects a model available to your account; the default
+is the provider's `deepseek-chat` alias. The server needs HTTPS access to
+`api.deepseek.com`. Statutes, cases, syllabus checklists and PDF reading work
+without AI credentials. Live AI output requires a valid key and account credits.
 
-To learn more about Next.js, take a look at the following resources:
+## Checks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+npm run lint
+npm test
+npm run build
+node scripts/validateBareActs.js
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Browser regressions cover search and case navigation, syllabus persistence,
+chat stream completion and regeneration, PDF saving/rendering/search/highlights,
+mobile navigation, and API input validation:
 
-## Deploy on Vercel
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+If Chromium is already installed in the cloud machine:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sh
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run test:e2e
+```
+
+The browser tests start the development server when needed. AI responses are
+mocked in those tests; they do not validate provider connectivity or answer
+accuracy. `npm run start` serves a completed production build.
+
+## Saved study work
+
+Syllabus progress, conversations, and annotations are saved in this browser.
+PDF documents are kept in IndexedDB. A local profile is an optional display name,
+not authentication or cloud synchronisation. Browser storage can be cleared or
+evicted. Workspace JSON backups include notes and progress, but not PDF binaries
+or API credentials; keep copies of the original PDFs.
+
+The library is a curated collection, not a complete or continuously updated legal
+database. Use the displayed dates and verify legal text and citations against
+official sources. Case detail pages contain study summaries, not full judgments.

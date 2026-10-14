@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { caseLaw } from '@/data/caseLaw';
 import FilterTabs from '@/components/FilterTabs';
 
 export default function ExamDetailClient({ exam }) {
@@ -57,11 +58,14 @@ export default function ExamDetailClient({ exam }) {
             <p>Must-read cases frequently tested in this exam.</p>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
-            {exam.importantCases.map((caseSlug) => (
-              <Link 
-                key={caseSlug} 
-                href="/case-law" 
-                className="card" 
+            {exam.importantCases.map((caseSlug) => {
+              const available = caseLaw.some(c => c.id === caseSlug);
+              const Tag = available ? Link : 'div';
+              return (
+              <Tag
+                key={caseSlug}
+                href={available ? `/case-law/${caseSlug}` : undefined}
+                className="card"
                 style={{ padding: 'var(--space-md)', flex: '1 1 300px', textDecoration: 'none' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
@@ -70,8 +74,9 @@ export default function ExamDetailClient({ exam }) {
                     {caseSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </span>
                 </div>
-              </Link>
-            ))}
+                {!available && <small style={{color:'var(--text-secondary)'}}>Summary not yet available in this library.</small>}
+              </Tag>
+            );})}
           </div>
         </>
       )}

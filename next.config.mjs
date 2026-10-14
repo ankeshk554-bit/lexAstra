@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  outputFileTracingIncludes: {
+    '/api/pdf-worker': ['./node_modules/pdfjs-dist/build/pdf.worker.min.mjs'],
+  },
 };
-
 export default nextConfig;

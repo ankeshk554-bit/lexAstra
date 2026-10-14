@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { actAliases } from '@/utils/actAliases';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
 import FilterTabs from '@/components/FilterTabs';
 
 export default function BareActsClient({ acts }) {
+  const searchableActs = useMemo(() => acts.map(act => ({...act, aliases:actAliases[act.slug] || ''})), [acts]);
   const [activeTab, setActiveTab] = useState('All');
   const [searchResults, setSearchResults] = useState(null);
 
-  const tabs = ['All', 'Constitutional', 'Criminal', 'Civil', 'Commercial', 'Labour', 'Family', 'Special Laws'];
+  const tabs = ['All', ...new Set(acts.map(act => act.category))];
 
   const filteredActs = (searchResults || acts).filter(
     (act) => activeTab === 'All' || act.category === activeTab
@@ -19,13 +21,14 @@ export default function BareActsClient({ acts }) {
     <div className="page-enter">
       <section className="hero" style={{ minHeight: 'auto', padding: 'var(--space-4xl) var(--space-md)' }}>
         <div className="container text-center">
-          <h1 className="hero__title" style={{ fontSize: 'var(--text-4xl)' }}>India&apos;s Complete Bare Acts Repository</h1>
-          <p className="hero__subtitle">Search across 500+ updated legislations with chapter and section-level navigation.</p>
-          
-          <SearchBar 
-            data={acts} 
+          <h1 className="hero__title" style={{ fontSize: 'var(--text-4xl)' }}>Bare acts library</h1>
+          <p className="hero__subtitle">Search the available Indian statutes, then read by chapter, section or article.</p>
+
+          <SearchBar
+            data={searchableActs}
             keys={[
               { name: 'name', weight: 2 },
+              { name: 'aliases', weight: 2 },
               { name: 'description', weight: 1 },
               { name: 'category', weight: 0.5 }
             ]}
@@ -38,7 +41,7 @@ export default function BareActsClient({ acts }) {
       <section className="section">
         <div className="container">
           <FilterTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
-          
+
           {filteredActs.length === 0 ? (
             <div className="no-results">
               <div className="no-results__icon">🔍</div>
@@ -46,7 +49,7 @@ export default function BareActsClient({ acts }) {
               <p>Try adjusting your search or filters.</p>
             </div>
           ) : (
-            <div className="card-grid">
+            <><p className="result-count" role="status">{filteredActs.length} acts available</p><div className="card-grid">
               {filteredActs.map(act => (
                 <div key={act.id} className="card">
                   <div className="act-card__header">
@@ -78,7 +81,7 @@ export default function BareActsClient({ acts }) {
                   </div>
                 </div>
               ))}
-            </div>
+            </div></>
           )}
         </div>
       </section>

@@ -1,9 +1,13 @@
 'use client';
 
+import { readAIStream } from '@/utils/aiStream.mjs';
+import 'pdfjs-dist/web/pdf_viewer.css';
+import { storage } from '@/utils/storage';
+
 import { useState, useEffect, useRef, memo, useCallback, useMemo } from 'react';
-import { 
-  Upload, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
-  Sparkles, Highlighter, Edit3, Trash2, Check, MessageSquare, 
+import {
+  Upload, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
+  Sparkles, Highlighter, Edit3, Trash2, Check, MessageSquare,
   BookOpen, Search, Copy, List, Maximize2, AlertCircle, FileText,
   Menu, X, Database, Folder, Plus, RefreshCw, Cloud, ArrowLeft,
   ChevronRightSquare, HelpCircle, HardDrive, Scale, Minimize2, Download,
@@ -236,7 +240,7 @@ const PDFPage = memo(({
           )}
         </>
       ) : (
-        <div 
+        <div
           style={{
             width: '100%',
             height: '100%',
@@ -259,11 +263,11 @@ const PDFPage = memo(({
   if (prevProps.pdfDocument !== nextProps.pdfDocument) return false;
   if (prevProps.rootRef !== nextProps.rootRef) return false;
   if (prevProps.onHighlightClick !== nextProps.onHighlightClick) return false;
-  
+
   const prevAnns = prevProps.annotations.filter(a => a.page === prevProps.pageNumber);
   const nextAnns = nextProps.annotations.filter(a => a.page === nextProps.pageNumber);
   if (prevAnns.length !== nextAnns.length) return false;
-  
+
   return JSON.stringify(prevAnns) === JSON.stringify(nextAnns);
 });
 
@@ -343,16 +347,16 @@ const getTextFromChildren = (children) => {
 
 const highlightText = (value) => {
   if (typeof value !== 'string') return value;
-  
+
   const regex = /(\b(?:AIR\s+\d{4}\s+SC\s+\d+|\(\d{4}\)\s+\d+\s+SCC\s+\d+|\d{4}\s+SCC\s+\d+)\b|\b(?:Section\s+\d+[A-Za-z0-9]*(?:\s+of\s+(?:the\s+)?[A-Za-z\s]+,?\s+\d{4})?|Article\s+\d+[A-Za-z0-9]*)\b)/g;
   const parts = value.split(regex);
   if (parts.length === 1) return value;
-  
+
   return parts.map((part, index) => {
     if (index % 2 === 0) {
       return part;
     }
-    
+
     const isCitation = /AIR|SCC/.test(part);
     if (isCitation) {
       return (
@@ -379,13 +383,15 @@ export default function PDFReaderClient() {
   });
   const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState('');
+  const [documentId, setDocumentId] = useState('');
+  const documentAbortRef = useRef(null);
   const [fileSize, setFileSize] = useState(0);
   const [pdfDocument, setPdfDocument] = useState(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(1.25);
   const [outline, setOutline] = useState([]);
-  
+
   // Collapsible Sidebar & Resizable AI Panel (Hide by default on document load)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatWidth, setChatWidth] = useState(400); // Default width: 400px
@@ -402,7 +408,7 @@ export default function PDFReaderClient() {
   const [selectedSubject, setSelectedSubject] = useState('All Subjects');
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadSubject, setUploadSubject] = useState('General Legal');
-  
+
   // Google Drive Sync States
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [driveConnected, setDriveConnected] = useState(false);
@@ -410,7 +416,7 @@ export default function PDFReaderClient() {
   const [driveStatus, setDriveStatus] = useState('Disconnected');
   const [googleClientId, setGoogleClientId] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_google_client_id') || '';
+      return storage.getItem('lexastra_google_client_id') || '';
     }
     return '';
   });
@@ -420,7 +426,7 @@ export default function PDFReaderClient() {
   const [pageTexts, setPageTexts] = useState([]);
   const [indexingProgress, setIndexingProgress] = useState(0);
   const [isIndexing, setIsIndexing] = useState(false);
-  
+
   // Annotation States
   const [annotations, setAnnotations] = useState([]);
   const [selectedColor, setSelectedColor] = useState('#FEF08A'); // Default: Pastel Yellow
@@ -433,9 +439,9 @@ export default function PDFReaderClient() {
   const [fitMode, setFitMode] = useState('width'); // 'width' | 'page' | 'custom'
   const [activeAnnotationMenu, setActiveAnnotationMenu] = useState(null); // { ann, left, top }
   const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
-  
+
   // Derived state: unique storage key for annotations
-  const pdfKey = fileName ? `lexastra_pdf_${fileName.replace(/\s+/g, '_')}` : '';
+  const pdfKey = documentId ? `lexastra_pdf_${documentId}` : '';
 
   // AI Assistant States
   const [chatHistory, setChatHistory] = useState([]);
@@ -445,20 +451,20 @@ export default function PDFReaderClient() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_deepseek_api_key') || '';
+      return storage.getItem('lexastra_deepseek_api_key') || '';
     }
     return '';
   });
   const [hasCustomApiKey, setHasCustomApiKey] = useState(() => {
     if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('lexastra_deepseek_api_key');
+      return !!storage.getItem('lexastra_deepseek_api_key');
     }
     return false;
   });
 
   const [examMode, setExamMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_exam_mode') || 'General';
+      return storage.getItem('lexastra_exam_mode') || 'General';
     }
     return 'General';
   });
@@ -466,13 +472,13 @@ export default function PDFReaderClient() {
   // Readability Document Themes
   const [readerTheme, setReaderTheme] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_reader_theme') || 'parchment';
+      return storage.getItem('lexastra_reader_theme') || 'parchment';
     }
     return 'parchment';
   });
 
   useEffect(() => {
-    localStorage.setItem('lexastra_reader_theme', readerTheme);
+    storage.setItem('lexastra_reader_theme', readerTheme);
   }, [readerTheme]);
 
   // Study Guide & Flashcard States
@@ -496,13 +502,13 @@ export default function PDFReaderClient() {
   const handleExportBackup = () => {
     try {
       const backupData = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode')) {
-          backupData[key] = localStorage.getItem(key);
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key && ((key.startsWith('lexastra_') && !key.includes('api_key') && !key.includes('token')) || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode')) {
+          backupData[key] = storage.getItem(key);
         }
       }
-      
+
       const jsonString = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -521,20 +527,19 @@ export default function PDFReaderClient() {
   const handleImportBackup = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const backupData = JSON.parse(event.target.result);
         let restoredCount = 0;
-        
+
         for (const key in backupData) {
-          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode') {
-            localStorage.setItem(key, backupData[key]);
-            restoredCount++;
+          if ((key.startsWith('lexastra_') && !key.includes('api_key') && !key.includes('token')) || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode') {
+            if (typeof backupData[key] === 'string' && storage.setItem(key, backupData[key])) restoredCount++;
           }
         }
-        
+
         if (restoredCount > 0) {
           alert('Backup restored successfully! The page will now reload.');
           window.location.reload();
@@ -548,32 +553,16 @@ export default function PDFReaderClient() {
     reader.readAsText(file);
   };
 
-  // Load PDF.js and lock body scroll
+  const [pdfEngineError, setPdfEngineError] = useState('');
   useEffect(() => {
     document.body.classList.add('full-screen-page');
-
-    if (!window.pdfjsLib) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.css';
-      document.head.appendChild(link);
-
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
-      script.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        setPdfjsLoaded(true);
-      };
-      document.body.appendChild(script);
-    } else {
-      setPdfjsLoaded(true);
-    }
-
-    return () => {
-      document.body.classList.remove('full-screen-page');
-      const pdfScript = document.querySelector('script[src*="pdf.min.js"]');
-      if (pdfScript) document.body.removeChild(pdfScript);
-    };
+    let active = true;
+    import('pdfjs-dist/build/pdf.mjs').then(lib => {
+      lib.GlobalWorkerOptions.workerSrc = `/api/pdf-worker?v=${lib.version}`;
+      window.pdfjsLib = lib;
+      if (active) setPdfjsLoaded(true);
+    }).catch(() => { if (active) setPdfEngineError('The PDF engine could not load. Reload the workspace to try again.'); });
+    return () => { active = false; documentAbortRef.current?.abort(); document.body.classList.remove('full-screen-page'); };
   }, []);
 
   // Fetch local books catalog on load
@@ -592,25 +581,28 @@ export default function PDFReaderClient() {
   }, [pdfjsLoaded]);
 
   // Adjust annotations and chat history state during rendering when fileName changes
-  const [prevFileName, setPrevFileName] = useState(fileName);
-  if (fileName !== prevFileName) {
-    setPrevFileName(fileName);
-    
+  const [prevPdfKey, setPrevPdfKey] = useState(pdfKey);
+  if (pdfKey !== prevPdfKey) {
+    setPrevPdfKey(pdfKey);
+
     // Load or reset annotations
-    const key = fileName ? `lexastra_pdf_${fileName.replace(/\s+/g, '_')}` : '';
+    const key = pdfKey;
+    const legacyKey = `lexastra_pdf_${fileName.replace(/\s+/g, '_')}`;
     let initialAnns = [];
     let initialFlashcards = [];
     if (typeof window !== 'undefined' && key) {
-      const storedAnns = localStorage.getItem(`${key}_anns`);
+      const storedAnns = storage.getItem(`${key}_anns`) ?? storage.getItem(`${legacyKey}_anns`);
       if (storedAnns) {
         try {
-          initialAnns = JSON.parse(storedAnns);
+          const parsed = JSON.parse(storedAnns);
+          initialAnns = Array.isArray(parsed) ? parsed.filter(a => a && typeof a.text === 'string' && Number.isFinite(a.page) && Array.isArray(a.rects) && a.rects.every(rect => rect && ['left','top','width','height'].every(key => Number.isFinite(rect[key])))) : [];
         } catch (e) {}
       }
-      const storedCards = localStorage.getItem(`${key}_flashcards`);
+      const storedCards = storage.getItem(`${key}_flashcards`) ?? storage.getItem(`${legacyKey}_flashcards`);
       if (storedCards) {
         try {
-          initialFlashcards = JSON.parse(storedCards);
+          const parsed = JSON.parse(storedCards);
+          initialFlashcards = Array.isArray(parsed) ? parsed.filter(c => c && typeof c.question === 'string' && typeof c.answer === 'string') : [];
         } catch (e) {}
       }
     }
@@ -629,14 +621,14 @@ export default function PDFReaderClient() {
   // Persist annotations to local storage
   useEffect(() => {
     if (pdfKey && annotations.length >= 0) {
-      localStorage.setItem(`${pdfKey}_anns`, JSON.stringify(annotations));
+      storage.setItem(`${pdfKey}_anns`, JSON.stringify(annotations));
     }
   }, [annotations, pdfKey]);
 
   // Persist flashcards to local storage
   useEffect(() => {
     if (pdfKey && flashcardDecks.length >= 0) {
-      localStorage.setItem(`${pdfKey}_flashcards`, JSON.stringify(flashcardDecks));
+      storage.setItem(`${pdfKey}_flashcards`, JSON.stringify(flashcardDecks));
     }
   }, [flashcardDecks, pdfKey]);
 
@@ -663,7 +655,7 @@ export default function PDFReaderClient() {
       const viewport = page.getViewport({ scale: 1 });
       const containerWidth = containerRef.current.clientWidth - 64; // pad space
       const containerHeight = containerRef.current.clientHeight - 64;
-      
+
       if (fitMode === 'width') {
         const newZoom = containerWidth / viewport.width;
         setZoom(Math.round(newZoom * 100) / 100);
@@ -723,7 +715,7 @@ export default function PDFReaderClient() {
 
     const matches = [];
     const queryLower = query.toLowerCase();
-    
+
     pageTexts.forEach(pt => {
       if (pt.text.toLowerCase().includes(queryLower)) {
         matches.push(pt.pageNumber);
@@ -732,7 +724,7 @@ export default function PDFReaderClient() {
 
     setPdfSearchResults(matches);
     setCurrentMatchIndex(0);
-    
+
     if (matches.length > 0) {
       scrollToPage(matches[0]);
     }
@@ -767,42 +759,50 @@ export default function PDFReaderClient() {
   }, [chatHistory, isChatLoading]);
 
   // Handle PDF parsing and text extraction in background for local RAG
-  const indexPDF = async (pdf) => {
+  const documentVersionRef = useRef(0);
+  const indexPDF = async (pdf, version) => {
     setIsIndexing(true);
     setIndexingProgress(0);
     const parsedTexts = [];
-    
+
     try {
       for (let i = 1; i <= pdf.numPages; i++) {
+        if (version !== documentVersionRef.current) return;
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const text = textContent.items.map(item => item.str).join(' ');
         parsedTexts.push({ pageNumber: i, text });
         setIndexingProgress(Math.round((i / pdf.numPages) * 100));
       }
-      setPageTexts(parsedTexts);
+      if (version === documentVersionRef.current) setPageTexts(parsedTexts);
     } catch (err) {
       console.error('Error indexing PDF text:', err);
     } finally {
-      setIsIndexing(false);
+      if (version === documentVersionRef.current) setIsIndexing(false);
     }
   };
 
   const loadPDF = async (arrayBuffer) => {
     if (!window.pdfjsLib) return;
-    
+    documentAbortRef.current?.abort();
+    documentAbortRef.current = new AbortController();
+    const version = ++documentVersionRef.current;
+    setPageTexts([]);
+    handleClearPDFSearch();
     try {
-      const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
       const pdf = await loadingTask.promise;
+      if (version !== documentVersionRef.current) { await pdf.destroy(); return; }
+      setDocumentId(pdf.fingerprints?.[0] || crypto.randomUUID());
       setPdfDocument(pdf);
       setNumPages(pdf.numPages);
       setCurrentPage(1);
-      
+
       // Scroll to top of container
       if (containerRef.current) {
         containerRef.current.scrollTop = 0;
       }
-      
+
       // Load Outline/TOC
       try {
         const outlineData = await pdf.getOutline();
@@ -812,7 +812,7 @@ export default function PDFReaderClient() {
       }
 
       // Start client-side RAG indexing in the background
-      indexPDF(pdf);
+      indexPDF(pdf, version);
     } catch (error) {
       alert('Error loading PDF: ' + error.message);
     }
@@ -821,11 +821,11 @@ export default function PDFReaderClient() {
   // Quick Open (reads PDF without saving to IndexedDB library)
   const handleQuickOpenUpload = (e) => {
     const uploadedFile = e.target.files[0];
-    if (uploadedFile && uploadedFile.type === 'application/pdf') {
+    if (uploadedFile && (uploadedFile.type === 'application/pdf' || /\.pdf$/i.test(uploadedFile.name))) {
       setFile(uploadedFile);
       setFileName(uploadedFile.name);
       setFileSize(uploadedFile.size);
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         loadPDF(event.target.result);
@@ -839,7 +839,7 @@ export default function PDFReaderClient() {
   // Library Permanent Save Importer
   const handleLibraryFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
+    if (file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name))) {
       setUploadFile(file);
     } else {
       alert('Please select a valid PDF file.');
@@ -850,27 +850,15 @@ export default function PDFReaderClient() {
     if (!uploadFile) return;
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const arrayBuffer = e.target.result;
-        const id = Math.random().toString(36).substring(7);
-        
-        // Save permanently to IndexedDB
-        await saveBook(id, uploadFile.name, uploadSubject, arrayBuffer, uploadFile.size);
-        
-        // Refresh catalog list
-        const books = await getAllBooks();
-        setLibraryBooks(books);
-        
-        // Reset importer states
-        setUploadFile(null);
-        
-        // Open the book instantly in the reader
-        setFileName(uploadFile.name);
-        setFileSize(uploadFile.size);
-        loadPDF(arrayBuffer);
-      };
-      reader.readAsArrayBuffer(uploadFile);
+      const selectedFile = uploadFile;
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const id = crypto.randomUUID();
+      await saveBook(id, selectedFile.name, uploadSubject, arrayBuffer, selectedFile.size);
+      setLibraryBooks(await getAllBooks());
+      setUploadFile(null);
+      setFileName(selectedFile.name);
+      setFileSize(selectedFile.size);
+      await loadPDF(arrayBuffer);
     } catch (err) {
       alert('Error saving to library: ' + err.message);
     }
@@ -903,6 +891,11 @@ export default function PDFReaderClient() {
   };
 
   const handleCloseActiveBook = () => {
+    documentAbortRef.current?.abort();
+    documentVersionRef.current++;
+    setDocumentId('');
+    setIsIndexing(false);
+    handleClearPDFSearch();
     setPdfDocument(null);
     setFileName('');
     setFileSize(0);
@@ -947,32 +940,32 @@ export default function PDFReaderClient() {
   // Text selection tracking
   const handleTextSelection = () => {
     if (!containerRef.current) return;
-    
+
     const selection = window.getSelection();
     const text = selection.toString().trim();
-    
+
     if (text && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
-      
+
       // Use startContainer to find the starting textLayer more reliably
       const startNode = range.startContainer;
-      const textLayerNode = startNode.nodeType === 3 
-        ? startNode.parentElement?.closest('.textLayer') 
+      const textLayerNode = startNode.nodeType === 3
+        ? startNode.parentElement?.closest('.textLayer')
         : startNode.closest?.('.textLayer') || startNode.parentElement?.closest('.textLayer');
-      
+
       const pageContainer = textLayerNode?.closest('.pdf-page-container');
-      
+
       if (textLayerNode && pageContainer) {
         const pageNumber = parseInt(pageContainer.getAttribute('data-page'), 10);
         setSelectedText(text);
         setActiveRange(range);
-        
+
         // Position tooltip toolbar
         const rects = range.getClientRects();
         if (rects.length > 0) {
           const firstRect = rects[0];
           const containerRect = containerRef.current.getBoundingClientRect();
-          
+
           setSelectionCoords({
             left: firstRect.left - containerRect.left + (firstRect.width / 2) - 130, // Center toolbar
             top: firstRect.top - containerRect.top - 45 + containerRef.current.scrollTop, // Hover above text
@@ -997,25 +990,25 @@ export default function PDFReaderClient() {
     // Ultimate PDF Highlighter Algorithm (Snap-to-Word):
     // Native browser selection across absolute-positioned elements (PDF.js) creates huge ghost rects
     // and full-width block selections for middle lines.
-    // We completely bypass the browser's native `range.getClientRects()` and instead extract the exact
+    // We completely bypass the browser’s native `range.getClientRects()` and instead extract the exact
     // bounding boxes of the physical PDF.js text <span> elements that the user's selection touched.
     const textLayerNode = document.querySelector(`.pdf-page-container[data-page="${targetPage}"] .textLayer`);
     let rects = [];
-    
+
     if (textLayerNode) {
       // Find all text spans intersected by the selection range
       const selectedSpans = Array.from(textLayerNode.querySelectorAll('span')).filter(span => activeRange.intersectsNode(span));
-      
+
       // Map them to their precise DOM rects. This guarantees the highlight perfectly hugs the text
       // and creates a professional "snap-to-word" effect, entirely avoiding margin bleed.
       rects = selectedSpans.map(span => span.getBoundingClientRect());
-      
+
       // Fallback if no spans found
       if (rects.length === 0) rects = Array.from(activeRange.getClientRects());
     } else {
       rects = Array.from(activeRange.getClientRects());
     }
-    
+
     const normalizedRects = [];
 
     // Group rects by approximate line to fix fragmented PDF text layer rects
@@ -1026,7 +1019,7 @@ export default function PDFReaderClient() {
       const nTop = (rect.top - textLayerRect.top) / zoom;
       const nWidth = rect.width / zoom;
       const nHeight = rect.height / zoom;
-      
+
       // Group by top position, rounded to nearest 4px to account for slight vertical variations
       const lineKey = Math.round(nTop / 4) * 4;
       if (!lines[lineKey]) lines[lineKey] = [];
@@ -1038,7 +1031,7 @@ export default function PDFReaderClient() {
       // Sort left-to-right
       const lineRects = lines[key].sort((a, b) => a.left - b.left);
       let currentMerge = { ...lineRects[0] };
-      
+
       for (let i = 1; i < lineRects.length; i++) {
         const r = lineRects[i];
         // If horizontal gap is small (e.g. less than 25px scaled), merge them to create a uniform block
@@ -1047,7 +1040,7 @@ export default function PDFReaderClient() {
           const newRight = Math.max(currentMerge.left + currentMerge.width, r.left + r.width);
           currentMerge.top = Math.min(currentMerge.top, r.top);
           const maxBottom = Math.max(currentMerge.top + currentMerge.height, r.top + r.height);
-          
+
           currentMerge.width = newRight - currentMerge.left;
           currentMerge.height = maxBottom - currentMerge.top;
         } else {
@@ -1069,7 +1062,7 @@ export default function PDFReaderClient() {
     };
 
     setAnnotations(prev => [...prev, newAnnotation]);
-    
+
     // Clear selection
     window.getSelection().removeAllRanges();
     setSelectedText('');
@@ -1094,7 +1087,7 @@ export default function PDFReaderClient() {
   };
 
   const handleSaveNote = (id) => {
-    setAnnotations(prev => prev.map(ann => 
+    setAnnotations(prev => prev.map(ann =>
       ann.id === id ? { ...ann, comment: tempNoteText } : ann
     ));
     setEditingNoteId(null);
@@ -1103,12 +1096,12 @@ export default function PDFReaderClient() {
   const handleHighlightClick = useCallback((ann, e) => {
     if (!containerRef.current) return;
     const containerRect = containerRef.current.getBoundingClientRect();
-    
+
     const left = e.clientX - containerRect.left;
     const top = e.clientY - containerRect.top + containerRef.current.scrollTop - 10;
-    
+
     console.log(`[PDFReaderClient] Opening highlight popover menu for annotation ID: ${ann.id} on page ${ann.page} at relative left: ${left.toFixed(1)}, top: ${top.toFixed(1)}`);
-    
+
     // Always query the latest annotation data from current state array
     setAnnotations(currentAnns => {
       const latestAnn = currentAnns.find(a => a.id === ann.id) || ann;
@@ -1125,7 +1118,7 @@ export default function PDFReaderClient() {
   }, []);
 
   const handleUpdateAnnotationColor = (id, color) => {
-    setAnnotations(prev => prev.map(ann => 
+    setAnnotations(prev => prev.map(ann =>
       ann.id === id ? { ...ann, color } : ann
     ));
     setActiveAnnotationMenu(prev => {
@@ -1140,7 +1133,7 @@ export default function PDFReaderClient() {
   };
 
   const handleSaveNoteFromPopover = (id) => {
-    setAnnotations(prev => prev.map(ann => 
+    setAnnotations(prev => prev.map(ann =>
       ann.id === id ? { ...ann, comment: tempNoteText } : ann
     ));
     setActiveAnnotationMenu(prev => {
@@ -1165,7 +1158,7 @@ export default function PDFReaderClient() {
     if (!selectedText || !selectionCoords) return;
     const targetPage = selectionCoords.page;
     const pageText = pageTexts.find(pt => pt.pageNumber === targetPage)?.text || '';
-    
+
     let prompt = '';
     const contextPrefix = pageText ? `[Full Page Context for Reference]:\n${pageText}\n\n[Analyze this specific highlighted text]:\n"${selectedText}"\n\n` : `Highlighted text: "${selectedText}"\n\n`;
 
@@ -1180,7 +1173,7 @@ export default function PDFReaderClient() {
     }
 
     handleSendChat(prompt, 'selection', selectedText);
-    
+
     // Clear selection
     window.getSelection().removeAllRanges();
     setSelectedText('');
@@ -1191,7 +1184,7 @@ export default function PDFReaderClient() {
   const askAboutHighlight = (ann, queryType) => {
     const pageText = pageTexts.find(pt => pt.pageNumber === ann.page)?.text || '';
     const contextPrefix = pageText ? `[Full Page Context for Reference]:\n${pageText}\n\n[Analyze this specific highlighted text]:\n"${ann.text}"\n\n` : `Highlighted text: "${ann.text}"\n\n`;
-    
+
     let prompt = '';
     if (queryType === 'explain') {
       prompt = `${contextPrefix}Analyze this highlighted text within the provided page context. Explain its legal effect, identify whether it constitutes a substantive right, procedural rule, or exception, and clarify its scope.`;
@@ -1206,9 +1199,9 @@ export default function PDFReaderClient() {
     if (!ann || isDraftingNote) return;
     setIsDraftingNote(true);
     setTempNoteText('AI is summarizing text into study note...');
-    
+
     try {
-      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const customKey = storage.getItem('lexastra_deepseek_api_key') || '';
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -1229,44 +1222,16 @@ export default function PDFReaderClient() {
 
       const response = await fetch('/api/chat', {
         method: 'POST',
+        signal: documentAbortRef.current?.signal,
         headers: headers,
-        body: JSON.stringify({ messages: promptMessages, examMode }),
+        body: JSON.stringify({ messages: promptMessages, examMode, fileName, task: 'note' }),
       });
 
       if (!response.ok) throw new Error('API request failed');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let draftedNote = '';
-      let buffer = '';
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data: ')) {
-              const dataStr = trimmed.slice(6);
-              if (dataStr === '[DONE]') continue;
-              try {
-                const data = JSON.parse(dataStr);
-                const content = data.choices[0]?.delta?.content || '';
-                draftedNote += content;
-                setTempNoteText(draftedNote);
-              } catch (e) {
-                // Ignore parsing errors
-              }
-            }
-          }
-        }
-      }
+      await readAIStream(response, text => setTempNoteText(text));
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error('Error drafting note with AI:', error);
       setTempNoteText('');
       alert('Failed to draft study note with AI. Please check your API key configuration and network connection.');
@@ -1281,12 +1246,12 @@ export default function PDFReaderClient() {
       alert('Page text is not indexed yet. Please wait a moment for the document to finish loading.');
       return;
     }
-    
+
     setIsGeneratingSummary(true);
     setPageSummary({ page: currentPage, summary: 'Generating summary...' });
-    
+
     try {
-      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const customKey = storage.getItem('lexastra_deepseek_api_key') || '';
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -1313,44 +1278,16 @@ Ensure it is concise, bulleted, and tailored to the ${examMode} exam requirement
 
       const response = await fetch('/api/chat', {
         method: 'POST',
+        signal: documentAbortRef.current?.signal,
         headers: headers,
-        body: JSON.stringify({ messages: promptMessages, examMode }),
+        body: JSON.stringify({ messages: promptMessages, examMode, fileName, task: 'summary' }),
       });
 
       if (!response.ok) throw new Error('API request failed');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let summaryText = '';
-      let buffer = '';
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data: ')) {
-              const dataStr = trimmed.slice(6);
-              if (dataStr === '[DONE]') continue;
-              try {
-                const data = JSON.parse(dataStr);
-                const content = data.choices[0]?.delta?.content || '';
-                summaryText += content;
-                setPageSummary({ page: currentPage, summary: summaryText });
-              } catch (e) {
-                // Ignore parsing errors
-              }
-            }
-          }
-        }
-      }
+      await readAIStream(response, text => setPageSummary({ page: currentPage, summary: text }));
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error('Error generating summary:', error);
       setPageSummary(null);
       alert('Failed to generate page summary. Please check your API key configuration and network connection.');
@@ -1365,12 +1302,12 @@ Ensure it is concise, bulleted, and tailored to the ${examMode} exam requirement
       alert('Page text is not indexed yet. Please wait a moment for the document to finish loading.');
       return;
     }
-    
+
     setIsGeneratingFlashcards(true);
     setIsFlashcardFlipped(false);
-    
+
     try {
-      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const customKey = storage.getItem('lexastra_deepseek_api_key') || '';
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -1399,50 +1336,21 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
       const response = await fetch('/api/chat', {
         method: 'POST',
+        signal: documentAbortRef.current?.signal,
         headers: headers,
-        body: JSON.stringify({ messages: promptMessages, examMode }),
+        body: JSON.stringify({ messages: promptMessages, examMode, fileName, task: 'flashcards' }),
       });
 
       if (!response.ok) throw new Error('API request failed');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let fullContent = '';
-      let buffer = '';
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data: ')) {
-              const dataStr = trimmed.slice(6);
-              if (dataStr === '[DONE]') continue;
-              try {
-                const data = JSON.parse(dataStr);
-                const content = data.choices[0]?.delta?.content || '';
-                fullContent += content;
-              } catch (e) {
-                // Ignore parsing errors
-              }
-            }
-          }
-        }
-      }
-
+      const fullContent = await readAIStream(response);
       let cleanedJson = fullContent.trim();
       if (cleanedJson.startsWith('```')) {
         cleanedJson = cleanedJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
       }
 
       const parsedCards = JSON.parse(cleanedJson);
-      if (Array.isArray(parsedCards) && parsedCards.length > 0) {
+      if (Array.isArray(parsedCards) && parsedCards.length > 0 && parsedCards.every(card => typeof card.question === 'string' && typeof card.answer === 'string')) {
         setFlashcardDecks(parsedCards);
         setActiveFlashcardIndex(0);
       } else {
@@ -1450,6 +1358,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
       }
 
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error('Error generating flashcards:', error);
       alert('Failed to generate flashcards. Please check your API key configuration and try again.');
     } finally {
@@ -1465,20 +1374,20 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
   // local RAG Search context construction for Legal Study
   const getRAGContext = (query) => {
     if (pageTexts.length === 0) return '';
-    
+
     let targetPageNums = new Set();
     const queryLower = query.toLowerCase();
 
     // 1. Check for specific citations in query (e.g., "section 302", "article 14")
     const sectionMatch = queryLower.match(/(?:section|sec\.|article|art\.|chapter|chap\.)\s*([0-9a-z]+)/);
-    
+
     if (sectionMatch) {
       // Find pages containing this section
       const citation = sectionMatch[0];
       const matchPages = pageTexts
         .filter(pt => pt.text.toLowerCase().includes(citation))
         .map(pt => pt.pageNumber);
-      
+
       if (matchPages.length > 0) {
         // Grab the first occurrence page and its adjacent page
         const p = matchPages[0];
@@ -1523,7 +1432,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
   const handleExamModeChange = (mode) => {
     setExamMode(mode);
-    localStorage.setItem('lexastra_exam_mode', mode);
+    storage.setItem('lexastra_exam_mode', mode);
   };
 
   const handleClearChat = () => {
@@ -1534,30 +1443,26 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     }
   };
 
-  const handleCopyMessage = (content, index) => {
-    navigator.clipboard.writeText(content);
+  const handleCopyMessage = async (content, index) => {
+    try { await navigator.clipboard.writeText(content); }
+    catch { alert('Copy is unavailable. Select the answer and copy it manually.'); return; }
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
   const handleRegenerateChat = () => {
     if (isChatLoading || chatHistory.length < 2) return;
-    
+
     const lastUserMsgIndex = [...chatHistory].reverse().findIndex(m => m.role === 'user');
     if (lastUserMsgIndex === -1) return;
-    
+
     const actualIndex = chatHistory.length - 1 - lastUserMsgIndex;
     const lastUserMsg = chatHistory[actualIndex];
-    
-    const newHistory = chatHistory.slice(0, actualIndex);
-    setChatHistory(newHistory);
-    
-    setTimeout(() => {
-      handleSendChat(lastUserMsg.content);
-    }, 100);
+
+    handleSendChat(lastUserMsg.content, null, null, chatHistory.slice(0, actualIndex));
   };
 
-  const handleSendChat = async (directText = null, directMode = null, directContextText = null) => {
+  const handleSendChat = async (directText = null, directMode = null, directContextText = null, history = chatHistory) => {
     const userMessage = (typeof directText === 'string' ? directText : chatInput).trim();
     if (!userMessage || isChatLoading) return;
 
@@ -1568,7 +1473,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     }
     setIsChatLoading(true);
 
-    const updatedHistory = [...chatHistory, { role: 'user', content: userMessage }];
+    const updatedHistory = [...history, { role: 'user', content: userMessage }];
     setChatHistory(updatedHistory);
 
     const activeMode = directMode || contextMode;
@@ -1576,7 +1481,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
     // Build context prompt
     let contextPrompt = '';
-    
+
     if (activeMode === 'current') {
       const pageText = pageTexts.find(pt => pt.pageNumber === currentPage);
       if (pageText) {
@@ -1598,7 +1503,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     });
 
     try {
-      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const customKey = storage.getItem('lexastra_deepseek_api_key') || '';
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -1608,94 +1513,30 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
       const response = await fetch('/api/chat', {
         method: 'POST',
+        signal: documentAbortRef.current?.signal,
         headers: headers,
         body: JSON.stringify({ messages: payloadMessages, examMode, fileName }),
       });
 
       if (!response.ok) {
-        setIsChatLoading(false);
-        let errorMsg = `API request failed (Status: ${response.status}).`;
-        
-        try {
-          const errData = await response.json();
-          if (errData.details) {
-            errorMsg = `DeepSeek Error: ${errData.details}`;
-          } else if (response.status === 400) {
-            errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
-          } else if (response.status === 401) {
-            errorMsg = 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the chat header.';
-          } else if (response.status === 402) {
-            errorMsg = 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the chat header.';
-          } else if (response.status === 403) {
-            errorMsg = 'Forbidden (Status 403). Access denied. Please ensure your API key has the correct permissions and your IP/region is allowed by DeepSeek.';
-          } else if (response.status === 429) {
-            errorMsg = 'Too Many Requests (Status 429). Rate limit exceeded. Please wait a moment before trying again.';
-          } else if (response.status >= 500) {
-            errorMsg = `Server Error (Status ${response.status}). The DeepSeek service might be experiencing temporary issues. Please try again later.`;
-          }
-        } catch(e) {
-          if (response.status === 400) {
-            errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
-          }
-        }
-        
-        const isKeyRelated = [400, 401, 402, 403].includes(response.status);
-        if (isKeyRelated && response.status !== 401 && response.status !== 402 && !errorMsg.includes('DeepSeek Error:')) {
-          errorMsg += ' You can update or clear your custom key via the **DeepSeek API Settings** in the chat header.';
-        }
-
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'assistant', content: errorMsg }
-        ]);
+        const data = await response.json().catch(() => ({}));
+        setChatHistory(prev => [...prev,{role:'assistant',content:typeof data.error === 'string' ? data.error : `The AI request failed (${response.status}). Please retry.`}]);
         return;
       }
 
       setChatHistory(prev => [...prev, { role: 'assistant', content: '' }]);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let aiResponseText = '';
-      let buffer = '';
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('data: ')) {
-              const dataStr = trimmed.slice(6);
-              if (dataStr === '[DONE]') continue;
-              try {
-                const data = JSON.parse(dataStr);
-                const content = data.choices[0]?.delta?.content || '';
-                aiResponseText += content;
-                
-                setChatHistory(prev => {
-                  const copy = [...prev];
-                  copy[copy.length - 1].content = aiResponseText;
-                  return copy;
-                });
-              } catch (e) {
-                // Ignore parsing errors
-              }
-            }
-          }
-        }
-      }
+      await readAIStream(response, text => setChatHistory(prev =>
+        prev.map((message, index) => index === prev.length - 1 ? {...message, content: text} : message)
+      ));
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.error('Chat Assistant Error:', err);
       setChatHistory(prev => [
-        ...prev, 
-        { 
-          role: 'assistant', 
-          content: 'Network connection failed. Please check your internet connection and ensure your local server is running, or verify your API key configuration.' 
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Network connection failed. Please check your internet connection and ensure your local server is running, or verify your API key configuration.'
         }
       ]);
     } finally {
@@ -1834,7 +1675,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     text({ value }) {
       return <>{highlightText(value)}</>;
     },
-    table({ children }) { 
+    table({ children }) {
       return (
         <div style={{ overflowX: 'auto', margin: '24px 0', borderRadius: '8px', border: '1px solid var(--border-gold)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -1847,7 +1688,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
     td({ children }) { return <td style={{ padding: '12px 16px', borderBottom: '1px solid rgba(0,0,0,0.05)', color: 'var(--charcoal)' }}>{children}</td> }
   };
 
-  const filteredBooks = selectedSubject === 'All Subjects' 
+  const filteredBooks = selectedSubject === 'All Subjects'
     ? libraryBooks
     : libraryBooks.filter(book => book.subject === selectedSubject);
 
@@ -1858,7 +1699,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
           <span></span><span></span><span></span>
         </div>
         <p style={{ marginTop: '16px', fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)' }}>
-          Loading PDF Core Engine...
+          {pdfEngineError || 'Preparing your PDF workspace…'}
         </p>
       </div>
     );
@@ -1870,19 +1711,19 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
       <aside className={`pdf-sidebar ${sidebarOpen ? '' : 'collapsed'}`}>
         <div className="pdf-sidebar__header-wrapper">
           <div className="pdf-sidebar__tabs">
-            <button 
+            <button
               className={`pdf-sidebar__tab ${activeTab === 'annotations' ? 'active' : ''}`}
               onClick={() => setActiveTab('annotations')}
             >
               <Highlighter size={13} /> Notes ({annotations.length})
             </button>
-            <button 
+            <button
               className={`pdf-sidebar__tab ${activeTab === 'study-guide' ? 'active' : ''}`}
               onClick={() => setActiveTab('study-guide')}
             >
               <Sparkles size={13} /> Study Guide
             </button>
-            <button 
+            <button
               className={`pdf-sidebar__tab ${activeTab === 'outline' ? 'active' : ''}`}
               onClick={() => setActiveTab('outline')}
               disabled={outline.length === 0}
@@ -1890,7 +1731,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               <List size={13} /> Outline
             </button>
           </div>
-          <button 
+          <button
             className="sidebar-close-btn"
             onClick={() => setSidebarOpen(false)}
             title="Collapse Sidebar"
@@ -1909,8 +1750,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 </div>
               ) : (
                 annotations.map((ann) => (
-                  <div 
-                    key={ann.id} 
+                  <div
+                    key={ann.id}
                     className="ann-card"
                     onClick={() => scrollToPage(ann.page)}
                   >
@@ -1918,7 +1759,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                       <span className="ann-card__badge" style={{ backgroundColor: ann.color, color: 'var(--navy)', border: '1px solid rgba(0,0,0,0.1)', fontWeight: '700' }}>
                         Page {ann.page}
                       </span>
-                      <button 
+                      <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteAnnotationConfirmed(ann.id); }}
                         className="ann-card__delete"
                         title="Delete highlight"
@@ -1926,14 +1767,14 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    
+
                     <blockquote className="ann-card__quote" style={{ borderLeftColor: ann.color }}>
                       {"\""}{ann.text}{"\""}
                     </blockquote>
 
                     {editingNoteId === ann.id ? (
                       <div className="ann-card__note-edit" onClick={(e) => e.stopPropagation()}>
-                        <textarea 
+                        <textarea
                           value={tempNoteText}
                           onChange={(e) => setTempNoteText(e.target.value)}
                           placeholder="Type note/comment..."
@@ -1955,25 +1796,25 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                             <p>{ann.comment}</p>
                           </div>
                         ) : null}
-                        
+
                         <div className="ann-card__actions-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: '8px' }}>
-                          <button 
+                          <button
                             onClick={(e) => { e.stopPropagation(); handleStartEditNote(ann); }}
                             className="ann-card__note-btn"
                             style={{ margin: 0 }}
                           >
                             <Edit3 size={11} /> {ann.comment ? 'Edit' : 'Add Note'}
                           </button>
-                          
+
                           <div className="ann-card__ai-actions" style={{ display: 'flex', gap: '6px' }}>
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); askAboutHighlight(ann, 'explain'); }}
                               className="ann-card__ai-btn"
                               title="Interpret clause within page context"
                             >
                               <BookOpen size={10} /> Interpret
                             </button>
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); askAboutHighlight(ann, 'cases'); }}
                               className="ann-card__ai-btn"
                               title="Find landmark cases interpreting this clause"
@@ -1990,7 +1831,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
             </div>
           ) : activeTab === 'study-guide' ? (
             <div className="pdf-study-guide-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
+
               {/* Part 1: Page Summary / Cheat Sheet */}
               <div className="study-guide-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <h4 style={{ margin: 0, fontSize: '13px', color: 'var(--navy)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1999,23 +1840,23 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
                   Generate a structured summary of the key principles, statutes, and cases on this page.
                 </p>
-                
+
                 {pageSummary && pageSummary.page === currentPage ? (
                   <div className="study-guide-summary-box" style={{ background: '#ffffff', border: '1px solid var(--border-gold)', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#333', lineHeight: '1.6', position: 'relative' }}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {pageSummary.summary}
                     </ReactMarkdown>
-                    <button 
-                      onClick={() => setPageSummary(null)} 
-                      className="btn btn--ghost btn--small" 
+                    <button
+                      onClick={() => setPageSummary(null)}
+                      className="btn btn--ghost btn--small"
                       style={{ fontSize: '10px', padding: '2px 6px', marginTop: '8px', border: '1px solid rgba(0,0,0,0.1)' }}
                     >
                       Clear Summary
                     </button>
                   </div>
                 ) : (
-                  <button 
-                    onClick={handleGeneratePageSummary} 
+                  <button
+                    onClick={handleGeneratePageSummary}
                     className="btn btn--gold-fill btn--small"
                     disabled={isGeneratingSummary}
                     style={{ justifyContent: 'center' }}
@@ -2038,9 +1879,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
                 {flashcardDecks && flashcardDecks.length > 0 ? (
                   <div className="flashcards-console" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
-                    
+
                     {/* 3D Flip Card */}
-                    <div 
+                    <div
                       className="flashcard-container"
                       onClick={() => setIsFlashcardFlipped(prev => !prev)}
                       style={{
@@ -2050,7 +1891,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         perspective: '1000px'
                       }}
                     >
-                      <div 
+                      <div
                         className={`flashcard-card ${isFlashcardFlipped ? 'flipped' : ''}`}
                         style={{
                           width: '100%',
@@ -2061,7 +1902,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         }}
                       >
                         {/* Front Side */}
-                        <div 
+                        <div
                           className="flashcard-front"
                           style={{
                             position: 'absolute',
@@ -2093,7 +1934,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         </div>
 
                         {/* Back Side */}
-                        <div 
+                        <div
                           className="flashcard-back"
                           style={{
                             position: 'absolute',
@@ -2157,13 +1998,13 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                       </button>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => {
                         setFlashcardDecks([]);
                         setActiveFlashcardIndex(0);
                         setIsFlashcardFlipped(false);
-                        localStorage.removeItem(`lexastra_pdf_flashcards_${fileName.replace(/\s+/g, '_')}`);
-                      }} 
+                        storage.removeItem(`lexastra_pdf_flashcards_${fileName.replace(/\s+/g, '_')}`);
+                      }}
                       className="btn btn--ghost btn--small"
                       style={{ fontSize: '10.5px', color: 'var(--charcoal)', width: '100%', justifyContent: 'center', marginTop: '8px', border: '1px solid rgba(0,0,0,0.1)' }}
                     >
@@ -2171,8 +2012,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                     </button>
                   </div>
                 ) : (
-                  <button 
-                    onClick={handleGenerateFlashcards} 
+                  <button
+                    onClick={handleGenerateFlashcards}
                     className="btn btn--gold-fill btn--small"
                     disabled={isGeneratingFlashcards}
                     style={{ justifyContent: 'center' }}
@@ -2217,10 +2058,10 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <h2><Database size={24} style={{ color: 'var(--gold)', verticalAlign: 'middle', marginRight: '8px' }} /> Permanent Law Library</h2>
                 <p>Add study textbooks and bare acts permanently to organize them by subject folder.</p>
               </div>
-              
-              <button 
-                onClick={() => setShowDriveModal(true)} 
-                className="btn btn--gold-fill" 
+
+              <button
+                onClick={() => setShowDriveModal(true)}
+                className="btn btn--gold-fill"
                 style={{ gap: '8px' }}
               >
                 <Database size={16} /> Backup & Restore
@@ -2232,15 +2073,15 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               <nav className="subject-nav">
                 <h3><Folder size={16} /> Subject Folders</h3>
                 {SUBJECTS.map((sub) => (
-                  <button 
+                  <button
                     key={sub}
                     className={`subject-nav__btn ${selectedSubject === sub ? 'active' : ''}`}
                     onClick={() => setSelectedSubject(sub)}
                   >
                     <span>{sub}</span>
                     <span className="count-badge">
-                      {sub === 'All Subjects' 
-                        ? libraryBooks.length 
+                      {sub === 'All Subjects'
+                        ? libraryBooks.length
                         : libraryBooks.filter(b => b.subject === sub).length
                       }
                     </span>
@@ -2263,8 +2104,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 ) : (
                   <div className="book-grid">
                     {filteredBooks.map((book) => (
-                      <div 
-                        key={book.id} 
+                      <div
+                        key={book.id}
                         className="book-card"
                         onClick={() => handleLoadBookFromLibrary(book.id, book.title, book.size)}
                       >
@@ -2276,8 +2117,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                           <span className="book-card__subject">{book.subject}</span>
                           <span className="book-card__size">{(book.size / (1024 * 1024)).toFixed(2)} MB</span>
                         </div>
-                        <button 
-                          className="book-card__delete" 
+                        <button
+                          className="book-card__delete"
                           onClick={(e) => handleDeleteBook(e, book.id)}
                           title="Delete book permanently"
                         >
@@ -2292,18 +2133,18 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               {/* Right Column: Library Importer/Dropzone */}
               <div className="library-importer">
                 <h3>Import Textbook / Bare Act</h3>
-                
+
                 {!uploadFile ? (
                   <>
-                    <input 
-                      type="file" 
-                      accept=".pdf" 
-                      onChange={handleLibraryFileSelect} 
-                      ref={libraryFileInputRef} 
-                      style={{ display: 'none' }} 
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleLibraryFileSelect}
+                      ref={libraryFileInputRef}
+                      style={{ display: 'none' }}
                     />
-                    <div 
-                      className="library-dropzone" 
+                    <div
+                      className="library-dropzone"
                       onClick={() => libraryFileInputRef.current.click()}
                     >
                       <Upload size={36} className="dropzone-icon" />
@@ -2323,8 +2164,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
                     <div className="form-group">
                       <label>Select Subject Folder:</label>
-                      <select 
-                        value={uploadSubject} 
+                      <select
+                        value={uploadSubject}
                         onChange={(e) => setUploadSubject(e.target.value)}
                       >
                         {SUBJECTS.filter(s => s !== 'All Subjects').map(s => (
@@ -2333,17 +2174,17 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                       </select>
                     </div>
 
-                    <button 
-                      onClick={handleSaveToLibrary} 
-                      className="btn btn--gold-fill" 
+                    <button
+                      onClick={handleSaveToLibrary}
+                      className="btn btn--gold-fill"
                       style={{ width: '100%', justifyContent: 'center' }}
                     >
                       <Plus size={16} /> Save to Permanent Library
                     </button>
-                    
-                    <button 
-                      onClick={() => setUploadFile(null)} 
-                      className="btn btn--ghost" 
+
+                    <button
+                      onClick={() => setUploadFile(null)}
+                      className="btn btn--ghost"
                       style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}
                     >
                       Cancel
@@ -2356,14 +2197,14 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
-                  <input 
-                    type="file" 
-                    accept=".pdf" 
-                    onChange={handleQuickOpenUpload} 
-                    ref={fileInputRef} 
-                    style={{ display: 'none' }} 
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleQuickOpenUpload}
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
                   />
-                  <button 
+                  <button
                     onClick={() => fileInputRef.current.click()}
                     className="btn btn--gold"
                     style={{ width: '100%', justifyContent: 'center' }}
@@ -2384,7 +2225,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
             <header className="pdf-toolbar">
               <div className="pdf-toolbar__group">
                 {/* Outline & Notes Sidebar toggle button */}
-                <button 
+                <button
                   className={`pdf-toolbar__btn ${sidebarOpen ? 'pdf-toolbar__btn--active' : ''}`}
                   onClick={() => setSidebarOpen(prev => !prev)}
                   title={sidebarOpen ? "Hide Outline & Notes Sidebar" : "Show Outline & Notes Sidebar"}
@@ -2392,8 +2233,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 >
                   {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
                 </button>
-                
-                <button 
+
+                <button
                   onClick={handleCloseActiveBook}
                   className="pdf-toolbar__btn"
                   title="Close document & return to library"
@@ -2408,8 +2249,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               </div>
 
               <div className="pdf-toolbar__group">
-                <button 
-                  className="pdf-toolbar__btn" 
+                <button
+                  className="pdf-toolbar__btn"
                   onClick={() => scrollToPage(Math.max(currentPage - 1, 1))}
                   disabled={currentPage === 1}
                 >
@@ -2418,8 +2259,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <span className="pdf-page-display">
                   Page {currentPage} of {numPages}
                 </span>
-                <button 
-                  className="pdf-toolbar__btn" 
+                <button
+                  className="pdf-toolbar__btn"
                   onClick={() => scrollToPage(Math.min(currentPage + 1, numPages))}
                   disabled={currentPage === numPages}
                 >
@@ -2431,9 +2272,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               <div className="pdf-toolbar__group pdf-toolbar__search-group">
                 <div className="pdf-search-input-wrapper">
                   <Search size={14} className="pdf-search-icon" />
-                  <input 
-                    type="text" 
-                    placeholder="Search in PDF..." 
+                  <input
+                    type="text"
+                    placeholder="Search in PDF..."
                     value={pdfSearchQuery}
                     onChange={(e) => handlePDFSearch(e.target.value)}
                     disabled={!pdfDocument || isIndexing}
@@ -2473,9 +2314,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <button className="pdf-toolbar__btn" onClick={() => { setZoom(1.25); setFitMode('custom'); }} title="Reset Zoom">
                   <Maximize2 size={16} />
                 </button>
-                
+
                 <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-                
+
                 {/* Document Theme Selector */}
                 <div className="pdf-theme-selector-group" style={{ display: 'flex', alignItems: 'center', gap: '5px', paddingRight: '4px' }}>
                   {[
@@ -2514,11 +2355,11 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                   <Minimize2 size={13} />
                   <span style={{ fontSize: '11px', fontWeight: '500' }}>Fit Page</span>
                 </button>
-                
+
                 <div className="menu-divider" style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-                
+
                 {/* Annotations Database Table toggle button */}
-                <button 
+                <button
                   className={`pdf-toolbar__btn ${bottomPanelOpen ? 'pdf-toolbar__btn--active' : ''}`}
                   onClick={() => setBottomPanelOpen(prev => !prev)}
                   title={bottomPanelOpen ? "Hide Notes & Highlights Table" : "Show Notes & Highlights Table"}
@@ -2527,9 +2368,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                   <Database size={16} />
                   <span style={{ fontSize: '11px', fontWeight: '500', marginLeft: '4px' }}>Database</span>
                 </button>
-                
+
                 {/* AI Chat Panel toggle button */}
-                <button 
+                <button
                   className={`pdf-toolbar__btn ${chatOpen ? 'pdf-toolbar__btn--active' : ''}`}
                   onClick={() => setChatOpen(prev => !prev)}
                   title={chatOpen ? "Hide AI Assistant Panel" : "Show AI Assistant Panel"}
@@ -2544,7 +2385,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
 
             {/* Canvas + Text Layer Wrapper */}
-            <div 
+            <div
               className={`pdf-render-scroll theme-${readerTheme}`}
               ref={containerRef}
               onMouseUp={handleTextSelection}
@@ -2566,7 +2407,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
               {/* Floating tooltip menu for active text selections */}
               {selectionCoords && (
-                <div 
+                <div
                   className="pdf-floating-menu"
                   style={{
                     left: `${selectionCoords.left}px`,
@@ -2602,7 +2443,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
               {/* Modernized Floating Annotation Popover Card */}
               {activeAnnotationMenu && (
-                <div 
+                <div
                   className="pdf-annotation-popover"
                   style={{
                     left: `${activeAnnotationMenu.left}px`,
@@ -2614,7 +2455,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 >
                   <div className="pdf-annotation-popover__header">
                     <span className="pdf-annotation-popover__title">Highlight • Page {activeAnnotationMenu.ann.page}</span>
-                    <button 
+                    <button
                       className="pdf-annotation-popover__close"
                       onClick={() => setActiveAnnotationMenu(null)}
                       title="Close Popover"
@@ -2622,10 +2463,10 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                       <X size={14} />
                     </button>
                   </div>
-                  
+
                   <div className="pdf-annotation-popover__body">
                     <div className="pdf-annotation-popover__quote-preview">
-                      "{activeAnnotationMenu.ann.text}"
+                      &ldquo;{activeAnnotationMenu.ann.text}&rdquo;
                     </div>
 
                     <div className="pdf-annotation-popover__colors">
@@ -2639,11 +2480,11 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                           { val: '#D8B4FE', name: 'Purple' },
                           { val: '#FDBA74', name: 'Orange' }
                         ].map((c) => (
-                          <button 
+                          <button
                             key={c.val}
                             onClick={() => handleUpdateAnnotationColor(activeAnnotationMenu.ann.id, c.val)}
                             className={`color-btn ${activeAnnotationMenu.ann.color === c.val ? 'color-btn--active' : ''}`}
-                            style={{ backgroundColor: c.val }} 
+                            style={{ backgroundColor: c.val }}
                             title={c.name}
                           />
                         ))}
@@ -2664,15 +2505,15 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         }}
                       />
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                        <button 
+                        <button
                           onClick={() => handleAiDraftNote(activeAnnotationMenu.ann)}
                           className="action-btn"
                           disabled={isDraftingNote}
-                          style={{ 
-                            padding: '3px 8px', 
-                            fontSize: '10.5px', 
-                            display: 'flex', 
-                            alignItems: 'center', 
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '10.5px',
+                            display: 'flex',
+                            alignItems: 'center',
                             gap: '4px',
                             background: 'rgba(201, 168, 76, 0.08)',
                             border: '1px solid rgba(201, 168, 76, 0.2)',
@@ -2685,9 +2526,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         >
                           <Sparkles size={11} /> {isDraftingNote ? 'Drafting...' : 'AI Draft Note'}
                         </button>
-                        
+
                         {activeAnnotationMenu.ann.comment !== tempNoteText && (
-                          <button 
+                          <button
                             onClick={() => handleSaveNoteFromPopover(activeAnnotationMenu.ann.id)}
                             className="btn btn--gold-fill btn--small"
                             style={{ padding: '4px 10px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
@@ -2701,21 +2542,21 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
                   <div className="pdf-annotation-popover__footer">
                     <div className="pdf-annotation-popover__ai-actions">
-                      <button 
+                      <button
                         onClick={() => {
                           askAboutHighlight(activeAnnotationMenu.ann, 'explain');
                           setActiveAnnotationMenu(null);
-                        }} 
+                        }}
                         className="action-btn"
                         title="Interpret clause within page context"
                       >
                         <BookOpen size={12} /> Interpret
                       </button>
-                      <button 
+                      <button
                         onClick={() => {
                           askAboutHighlight(activeAnnotationMenu.ann, 'cases');
                           setActiveAnnotationMenu(null);
-                        }} 
+                        }}
                         className="action-btn"
                         title="Find landmark cases interpreting this clause"
                       >
@@ -2723,7 +2564,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                       </button>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => handleDeleteAnnotationFromPopover(activeAnnotationMenu.ann.id)}
                       className="popover-delete-btn"
                       title="Delete highlight & note"
@@ -2745,7 +2586,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                       Notes & Highlights Database ({annotations.length})
                     </span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setBottomPanelOpen(false)}
                     className="pdf-annotation-popover__close"
                     title="Hide Database"
@@ -2775,7 +2616,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         {annotations.map((ann) => (
                           <tr key={ann.id}>
                             <td>
-                              <button 
+                              <button
                                 onClick={() => scrollToPage(ann.page)}
                                 className="table-page-link"
                                 title={`Scroll to Page ${ann.page}`}
@@ -2788,7 +2629,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                                 <span className="color-indicator-dot" style={{ backgroundColor: ann.color }} />
                                 <div className="table-color-picker">
                                   {['#FEF08A', '#86EFAC', '#93C5FD', '#F9A8D4', '#D8B4FE', '#FDBA74'].map(c => (
-                                    <button 
+                                    <button
                                       key={c}
                                       onClick={() => handleUpdateAnnotationColor(ann.id, c)}
                                       className="color-dot-mini"
@@ -2804,10 +2645,10 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                             <td className="table-note-cell">
                               {editingNoteId === ann.id ? (
                                 <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
-                                  <input 
-                                    type="text" 
-                                    value={tempNoteText} 
-                                    onChange={(e) => setTempNoteText(e.target.value)} 
+                                  <input
+                                    type="text"
+                                    value={tempNoteText}
+                                    onChange={(e) => setTempNoteText(e.target.value)}
                                     style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-gold)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: '12px', outline: 'none' }}
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') handleSaveNote(ann.id);
@@ -2833,7 +2674,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '4px' }}>
-                                <button 
+                                <button
                                   onClick={() => askAboutHighlight(ann, 'explain')}
                                   className="btn btn--primary btn--small"
                                   style={{ fontSize: '10px', padding: '3px 6px', gap: '2px' }}
@@ -2841,7 +2682,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                                 >
                                   <BookOpen size={10} /> Interpret
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => askAboutHighlight(ann, 'cases')}
                                   className="btn btn--ghost btn--small"
                                   style={{ fontSize: '10px', padding: '3px 6px', gap: '2px' }}
@@ -2852,7 +2693,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                               </div>
                             </td>
                             <td>
-                              <button 
+                              <button
                                 onClick={() => handleDeleteAnnotationConfirmed(ann.id)}
                                 className="table-delete-btn"
                                 title="Delete Highlight & Note"
@@ -2874,7 +2715,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
 
       {/* 3. Panel Resize Handle */}
       {pdfDocument && (
-        <div 
+        <div
           className={`pdf-resize-handle ${!chatOpen ? 'pdf-resize-handle--collapsed' : ''}`}
           onMouseDown={startResizing}
           title="Drag to resize AI assistant window"
@@ -2889,10 +2730,10 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               <Sparkles size={16} style={{ color: 'var(--gold)' }} />
               <h3 style={{ margin: 0 }}>AI Assistant</h3>
             </div>
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <select 
-                value={examMode} 
+              <select
+                value={examMode}
                 onChange={(e) => handleExamModeChange(e.target.value)}
                 className="pdf-exam-selector"
               >
@@ -2908,8 +2749,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <option value="UPSC Law Optional">UPSC Law</option>
                 <option value="IBPS SO Law">IBPS SO</option>
               </select>
-              
-              <button 
+
+              <button
                 onClick={() => setShowApiKeyModal(true)}
                 className="pdf-toolbar__btn"
                 title="DeepSeek API Settings"
@@ -2918,7 +2759,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <Settings size={14} />
               </button>
 
-              <button 
+              <button
                 onClick={handleClearChat}
                 className="pdf-toolbar__btn"
                 title="Clear Chat History"
@@ -2932,7 +2773,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
           <div className="pdf-chat-messages">
             {chatHistory.map((msg, index) => {
               const parsed = msg.role === 'assistant' ? parseFollowUps(msg.content) : { cleanText: msg.content, followUps: [] };
-              
+
               return (
               <div key={index} className={`chat-message-wrapper ${msg.role === 'user' ? 'chat-message-wrapper--user' : 'chat-message-wrapper--ai'}`}>
                 <div className="chat-message">
@@ -2962,7 +2803,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                           {copiedIndex === index ? <Check size={12} /> : <Copy size={12} />}
                           <span>{copiedIndex === index ? 'Copied' : 'Copy'}</span>
                         </button>
-                        
+
                         {index === chatHistory.length - 1 && !isChatLoading && chatHistory.length > 1 && (
                           <button onClick={handleRegenerateChat} className="chat-msg-action-btn chat-regenerate-btn">
                             <RefreshCw size={12} /> <span>Regenerate</span>
@@ -2970,18 +2811,18 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                         )}
                       </div>
                     )}
-                    
+
                     {parsed.followUps.length > 0 && index === chatHistory.length - 1 && !isChatLoading && (
                       <div className="chat-msg-followups" style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>Suggested Follow-ups:</span>
                         {parsed.followUps.map((f, i) => (
-                          <button 
-                            key={i} 
+                          <button
+                            key={i}
                             onClick={() => handleSendChat(f, 'search')}
                             className="chat-preset-btn"
                             style={{ textAlign: 'left', whiteSpace: 'normal', height: 'auto', padding: '6px 10px', display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12px', border: '1px solid rgba(201, 168, 76, 0.3)', background: 'rgba(201, 168, 76, 0.05)', color: 'var(--navy)' }}
                           >
-                            <Sparkles size={12} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--gold-main)' }} /> 
+                            <Sparkles size={12} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--gold-main)' }} />
                             <span>{f}</span>
                           </button>
                         ))}
@@ -3014,20 +2855,20 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               <span className="context-label">AI Search Context:</span>
               <div className="context-options">
                 <label className={`context-option ${contextMode === 'search' ? 'active' : ''}`} title="Automatically scans the document for related sections, cross-references, and adjacent pages.">
-                  <input 
-                    type="radio" 
-                    name="context" 
-                    value="search" 
+                  <input
+                    type="radio"
+                    name="context"
+                    value="search"
                     checked={contextMode === 'search'}
                     onChange={() => setContextMode('search')}
                   />
                   Smart Legal Search
                 </label>
                 <label className={`context-option ${contextMode === 'current' ? 'active' : ''}`} title="Strictly restricts the AI's knowledge to the current page. Best for highly specific page queries.">
-                  <input 
-                    type="radio" 
-                    name="context" 
-                    value="current" 
+                  <input
+                    type="radio"
+                    name="context"
+                    value="current"
                     checked={contextMode === 'current'}
                     onChange={() => setContextMode('current')}
                   />
@@ -3035,10 +2876,10 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 </label>
                 {selectedText && (
                   <label className={`context-option ${contextMode === 'selection' ? 'active' : ''}`}>
-                    <input 
-                      type="radio" 
-                      name="context" 
-                      value="selection" 
+                    <input
+                      type="radio"
+                      name="context"
+                      value="selection"
                       checked={contextMode === 'selection'}
                       onChange={() => setContextMode('selection')}
                     />
@@ -3051,7 +2892,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
             <div className="chat-presets" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="context-label">Page Study Presets (Page {currentPage}):</span>
-                <button 
+                <button
                   onClick={() => setShowPresets(!showPresets)}
                   style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
                   title={showPresets ? "Hide Presets" : "Show Presets"}
@@ -3063,7 +2904,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               {showPresets && (
                 <div className="chat-presets-row" style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
                   {getExamPresets(examMode, currentPage).map((preset, pIdx) => (
-                    <button 
+                    <button
                       key={pIdx}
                       onClick={() => handleSendChat(preset.prompt, 'current')}
                       className={`chat-preset-btn ${examMode !== 'General' ? 'exam-specific' : ''}`}
@@ -3082,8 +2923,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder={
-                  contextMode === 'selection' 
-                    ? "Ask anything about selection..." 
+                  contextMode === 'selection'
+                    ? "Ask anything about selection..."
                     : `Ask anything about ${fileName || 'document'}...`
                 }
                 onKeyDown={(e) => {
@@ -3094,8 +2935,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 }}
                 disabled={!pdfDocument}
               />
-              <button 
-                onClick={handleSendChat} 
+              <button
+                onClick={handleSendChat}
                 className="chat-send-btn"
                 disabled={!pdfDocument || !chatInput.trim() || isChatLoading}
               >
@@ -3116,7 +2957,7 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="pdf-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="sync-status-box" style={{ background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.15)', textAlign: 'center', padding: '16px', borderRadius: '8px' }}>
                 <HardDrive size={36} style={{ color: 'var(--gold)', marginBottom: '8px', display: 'inline-block' }} />
@@ -3127,28 +2968,28 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button 
-                  onClick={handleExportBackup} 
-                  className="btn btn--gold-fill" 
+                <button
+                  onClick={handleExportBackup}
+                  className="btn btn--gold-fill"
                   style={{ width: '100%', justifyContent: 'center', gap: '8px' }}
                 >
                   <Download size={16} /> Export JSON Backup File
                 </button>
-                
-                <button 
-                  onClick={() => backupFileInputRef.current?.click()} 
-                  className="btn btn--ghost" 
+
+                <button
+                  onClick={() => backupFileInputRef.current?.click()}
+                  className="btn btn--ghost"
                   style={{ width: '100%', justifyContent: 'center', gap: '8px', border: '1px solid var(--border-subtle)' }}
                 >
                   <Upload size={16} /> Restore from Backup File
                 </button>
-                
-                <input 
-                  type="file" 
-                  ref={backupFileInputRef} 
-                  onChange={handleImportBackup} 
-                  accept=".json" 
-                  style={{ display: 'none' }} 
+
+                <input
+                  type="file"
+                  ref={backupFileInputRef}
+                  onChange={handleImportBackup}
+                  accept=".json"
+                  style={{ display: 'none' }}
                 />
               </div>
             </div>
@@ -3168,20 +3009,20 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="pdf-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'left' }}>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.4', margin: 0 }}>
-                Configure your own DeepSeek API Key. Your custom key will be stored securely in your browser's local storage and used directly for all AI queries.
+                Configure your own DeepSeek API Key. Your custom key will be stored in your browser’s local storage and used directly for all AI queries.
               </p>
-              
+
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const trimmed = apiKeyInput.trim();
                 if (trimmed) {
-                  localStorage.setItem('lexastra_deepseek_api_key', trimmed);
+                  storage.setItem('lexastra_deepseek_api_key', trimmed);
                   setHasCustomApiKey(true);
                 } else {
-                  localStorage.removeItem('lexastra_deepseek_api_key');
+                  storage.removeItem('lexastra_deepseek_api_key');
                   setHasCustomApiKey(false);
                 }
                 setShowApiKeyModal(false);
@@ -3191,8 +3032,8 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
                     DeepSeek API Key:
                   </label>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     placeholder="sk-..."
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
@@ -3209,12 +3050,12 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                     autoFocus
                   />
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
-                      localStorage.removeItem('lexastra_deepseek_api_key');
+                      storage.removeItem('lexastra_deepseek_api_key');
                       setApiKeyInput('');
                       setHasCustomApiKey(false);
                       setShowApiKeyModal(false);
@@ -3225,9 +3066,9 @@ Do not return any markdown formatting, preambles, or explanations. Return ONLY t
                   >
                     Clear Key
                   </button>
-                  <button 
-                    type="submit" 
-                    className="btn btn--gold-fill" 
+                  <button
+                    type="submit"
+                    className="btn btn--gold-fill"
                     style={{ flex: 2, justifyContent: 'center' }}
                   >
                     Save API Key

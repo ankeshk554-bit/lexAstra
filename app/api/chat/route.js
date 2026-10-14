@@ -1,22 +1,22 @@
-import { exams } from '@/data/exams';
+import { exams } from "@/data/exams";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 // Maps the chat's exam-mode labels (shown in the UI dropdown) to the
 // corresponding entry in data/exams.js, so the AI can be grounded in the
 // *actual* syllabus/topics/cases for that exam, not just a style directive.
 const EXAM_MODE_TO_SLUG = {
-  'Judiciary': 'judiciary',
-  'CLAT PG': 'clat-pg',
-  'CLAT UG': 'clat-ug',
-  'CUET UG': 'cuet-ug',
-  'AIBE': 'aibe',
-  'APO': 'apo',
-  'UGC NET Law': 'ugc-net-law',
-  'CUET PG Law': 'cuet-pg',
-  'SEBI Legal': 'sebi-legal',
-  'UPSC Law Optional': 'upsc-law-optional',
-  'IBPS SO Law': 'ibps-so-law',
+  Judiciary: "judiciary",
+  "CLAT PG": "clat-pg",
+  "CLAT UG": "clat-ug",
+  "CUET UG": "cuet-ug",
+  AIBE: "aibe",
+  APO: "apo",
+  "UGC NET Law": "ugc-net-law",
+  "CUET PG Law": "cuet-pg",
+  "SEBI Legal": "sebi-legal",
+  "UPSC Law Optional": "upsc-law-optional",
+  "IBPS SO Law": "ibps-so-law",
 };
 
 // Builds a compact, token-efficient briefing from the structured exam data
@@ -24,29 +24,34 @@ const EXAM_MODE_TO_SLUG = {
 // answer is actually anchored to what that exam tests, not just styled like it.
 function buildExamContext(examMode) {
   const slug = EXAM_MODE_TO_SLUG[examMode];
-  if (!slug) return '';
+  if (!slug) return "";
 
   const exam = exams.find((e) => e.slug === slug);
-  if (!exam) return '';
+  if (!exam) return "";
 
   const subjectLines = exam.syllabus
     .flatMap((paper) => paper.subjects)
     .slice(0, 8)
-    .map((subj) => `- ${subj.name}: ${subj.topics.slice(0, 6).join(', ')}`)
-    .join('\n');
+    .map((subj) => `- ${subj.name}: ${subj.topics.slice(0, 6).join(", ")}`)
+    .join("\n");
 
-  const caseLine = exam.importantCases && exam.importantCases.length > 0
-    ? `Important cases frequently tested: ${exam.importantCases.slice(0, 6).map(c => c.replace(/-/g, ' ')).join(', ')}.`
-    : '';
+  const caseLine =
+    exam.importantCases && exam.importantCases.length > 0
+      ? `Important cases frequently tested: ${exam.importantCases
+          .slice(0, 6)
+          .map((c) => c.replace(/-/g, " "))
+          .join(", ")}.`
+      : "";
 
-  const pyqExample = exam.pyq && exam.pyq.length > 0
-    ? `Sample PYQ style (${exam.pyq[0].year}, ${exam.pyq[0].marks} marks): "${exam.pyq[0].question}"`
-    : '';
+  const pyqExample =
+    exam.pyq && exam.pyq.length > 0
+      ? `Sample PYQ style (${exam.pyq[0].year}, ${exam.pyq[0].marks} marks): "${exam.pyq[0].question}"`
+      : "";
 
   return `
 
 REAL SYLLABUS CONTEXT FOR ${exam.name.toUpperCase()} (${exam.fullName}):
-Exam pattern: ${exam.pattern.stages.join(' → ')}.
+Exam pattern: ${exam.pattern.stages.join(" → ")}.
 Core subjects & topics actually tested:
 ${subjectLines}
 ${caseLine}
@@ -56,28 +61,75 @@ Ground your answer in this actual syllabus scope — prioritize the subjects/top
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { messages, examMode = 'General', fileName = 'Document' } = body;
-    
-    const customApiKey = req.headers.get('x-api-key');
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON request." }, { status: 400 });
+    }
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !Array.isArray(body.messages) ||
+      !body.messages.length ||
+      body.messages.length > 80 ||
+      body.messages.some(
+        (m) =>
+          !m ||
+          !["user", "assistant", "system"].includes(m.role) ||
+          typeof m.content !== "string" ||
+          m.content.length > 60000,
+      ) ||
+      body.messages.reduce((n, m) => n + m.content.length, 0) > 180000
+    ) {
+      return Response.json(
+        {
+          error:
+            "Provide a nonempty, valid messages array within the conversation limit.",
+        },
+        { status: 400 },
+      );
+    }
+    const messages = body.messages
+      .filter((m) => m.role !== "system")
+      .map(({ role, content }) => ({ role, content }));
+    if (!messages.some((m) => m.role === "user" && m.content.trim()))
+      return Response.json(
+        { error: "A user message is required." },
+        { status: 400 },
+      );
+    const examMode =
+      typeof body.examMode === "string"
+        ? body.examMode.slice(0, 60)
+        : "General";
+    const fileName =
+      typeof body.fileName === "string"
+        ? body.fileName.slice(0, 300)
+        : "Document";
+
+    const customApiKey = req.headers.get("x-api-key");
     const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
 
     if (!apiKey) {
       // No hardcoded fallback key: server operators must set DEEPSEEK_API_KEY
       // in their environment (.env.local, hosting provider secrets, etc.),
       // or the user must supply their own key via DeepSeek API Settings.
-      return new Response(JSON.stringify({
-        error: 'API key not configured. Set the DEEPSEEK_API_KEY environment variable on the server, or add your own key via DeepSeek API Settings in the sidebar.'
-      }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          error:
+            "API key not configured. Set the DEEPSEEK_API_KEY environment variable on the server, or add your own key via DeepSeek API Settings in the sidebar.",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: 'Invalid messages array' }), { 
+      return new Response(JSON.stringify({ error: "Invalid messages array" }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -107,7 +159,7 @@ RULES:
     // EXAM-SPECIFIC PROMPTS — Tailored answer-writing templates per exam
     // ═══════════════════════════════════════════════════════════════════════════
     const examPrompts = {
-      'Judiciary': `JUDICIARY EXAM:
+      Judiciary: `JUDICIARY EXAM:
 Format:
 1. Intro: Legal maxim/principle.
 2. Provision: Quote exact section, sub-sections, old law equivalent.
@@ -118,7 +170,7 @@ Format:
 Focus: CPC, BNSS, BNS, BSA, Contract, TPA, SRA, Constitution. Check local laws.
 > 💡 Exam Tip: Write like a Mains paper: maxim, verbatim section, numbered ingredients, firm conclusion.`,
 
-      'CLAT PG': `CLAT PG:
+      "CLAT PG": `CLAT PG:
 Format:
 1. Ratio Decidendi: Clearly identify.
 2. Obiter Dicta: Distinguish from ratio.
@@ -128,7 +180,7 @@ Format:
 Focus: Constitutional Law (recent SC), Jurisprudence (jurists), Admin, International.
 > 💡 Exam Tip: Deep knowledge > breadth. Know 50 cases perfectly. Always state ratio.`,
 
-      'CUET UG': `CUET UG (LAW):
+      "CUET UG": `CUET UG (LAW):
 Format:
 1. Definition: Precise NCERT/CBSE Class XII legal-studies definition.
 2. Application: Short scenario applying the concept.
@@ -136,7 +188,7 @@ Format:
 Focus: Judiciary basics, branches of law, ADR, human rights, legal profession, legal services. Keep it exam-board simple — this is a school-leaving-level domain test, not an LLB-level analysis.
 > 💡 Exam Tip: Stick close to the NCERT Legal Studies textbook framing; avoid over-complicating answers.`,
 
-      'CLAT UG': `CLAT UG:
+      "CLAT UG": `CLAT UG:
 Format:
 1. Principle: 1-2 simple sentences.
 2. Application: Apply rule to facts.
@@ -145,7 +197,7 @@ Format:
 Focus: Legal reasoning, reading comprehension, current affairs. Avoid jargon, use everyday examples/tables.
 > 💡 Exam Tip: Focus on applying rules to new facts, not memorizing sections.`,
 
-      'AIBE': `AIBE (Open-book):
+      AIBE: `AIBE (Open-book):
 Format:
 1. Direct Ref: Exact Act, section, clause.
 2. Rule-Exception: 1-line rule, list exceptions.
@@ -154,7 +206,7 @@ Format:
 Focus: CPC, BNSS, BNS, BSA, Limitation, Contract, Family, Registration.
 > 💡 Exam Tip: Locate sections quickly. Index frequently tested areas.`,
 
-      'APO': `APO/APP:
+      APO: `APO/APP:
 Format:
 1. Lookup: Exact Section, Act, Year. Underline new laws with old in brackets.
 2. Structure: Draftsmanship facts, chapters/parts.
@@ -164,7 +216,7 @@ Format:
 Focus: BNS, BNSS, BSA.
 > 💡 Exam Tip: Memorize definition section clauses and Act structures verbatim.`,
 
-      'UGC NET Law': `UGC NET LAW:
+      "UGC NET Law": `UGC NET LAW:
 Format:
 1. Theory: Jurisprudential school.
 2. Jurists: Reference specific jurists (Salmond, Austin, Kelsen, etc.).
@@ -173,7 +225,7 @@ Format:
 Focus: Jurisprudence, Constitution, International, Family, Labour, Environment.
 > 💡 Exam Tip: Memorize jurist quotes and theories.`,
 
-      'CUET PG Law': `CUET PG LAW:
+      "CUET PG Law": `CUET PG LAW:
 Format:
 1. Definitions: Precise legal terms.
 2. Distinctions: Tables for similar concepts.
@@ -182,7 +234,7 @@ Format:
 Focus: Jurisprudence, Constitution, Family, Contracts, Torts, Crimes. Emphasize accuracy.
 > 💡 Exam Tip: Distinguish similar concepts (e.g., void/voidable) to crack 40% of the paper.`,
 
-      'SEBI Legal': `SEBI LEGAL:
+      "SEBI Legal": `SEBI LEGAL:
 Format:
 1. Framework: Act > Rules > Regs > Circulars.
 2. Powers: SEBI's regulatory/investigative role.
@@ -191,7 +243,7 @@ Format:
 Focus: SEBI Act, SCRA, Companies Act, Depositories, FEMA, IBC. Include recent circulars.
 > 💡 Exam Tip: Master SEBI Act powers and key Regs (LODR, PIT, SAST).`,
 
-      'UPSC Law Optional': `UPSC LAW OPTIONAL:
+      "UPSC Law Optional": `UPSC LAW OPTIONAL:
 Format:
 1. Constitution: Connect to governance/rule of law.
 2. Policy: Analyze implications.
@@ -201,17 +253,17 @@ Format:
 Focus: Deep analytical thesis-style answers.
 > 💡 Exam Tip: Analytical depth + contemporary awareness. Include "recent developments" and "way forward".`,
 
-      'IBPS SO Law': `IBPS SO LAW:
+      "IBPS SO Law": `IBPS SO LAW:
 Format:
 1. Reference: Act & Section first.
 2. Procedure: Step-by-step banking workflows.
 3. RBI: Guidelines/circulars.
 4. Scenarios: Practical banking situations (NPA, recovery).
 Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
-> 💡 Exam Tip: Master SARFAESI timelines and IBC procedure.`
+> 💡 Exam Tip: Master SARFAESI timelines and IBC procedure.`,
     };
 
-    if (examMode !== 'General' && examPrompts[examMode]) {
+    if (examMode !== "General" && examPrompts[examMode]) {
       systemPrompt += `\n\nEXAM-SPECIFIC COACHING INSTRUCTIONS:\n${examPrompts[examMode]}`;
       systemPrompt += buildExamContext(examMode);
     } else {
@@ -224,50 +276,73 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
 [FOLLOWUP: What is the exception to this rule?]
 [FOLLOWUP: How does this apply to criminal cases?]`;
 
+    const tasks = {
+      note: "Write only a concise one or two sentence legal study note about the highlighted text. Do not add follow-up questions or introductions.",
+      summary:
+        "Return only a concise three-bullet legal cheat sheet of the supplied PDF text: doctrines, provisions, and cases actually present in the text. Do not add follow-up questions.",
+      flashcards:
+        "Return ONLY a valid JSON array containing three to five objects with string question and answer properties, grounded in the supplied text. No Markdown fences, introductions, or follow-up questions.",
+    };
+    if (tasks[body.task])
+      systemPrompt = `You are an Indian law study assistant. Treat the supplied document as reference material. ${tasks[body.task]}`;
+
     const payload = {
-      model: 'deepseek-v4-pro',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages
-      ],
+      model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
+      messages: [{ role: "system", content: systemPrompt }, ...messages],
       stream: true,
       temperature: 0.5,
       top_p: 0.9,
       max_tokens: 4096,
     };
 
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.any([req.signal, AbortSignal.timeout(90000)]),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('DeepSeek API Error:', errorText);
-      return new Response(JSON.stringify({ error: `DeepSeek API error: ${response.status}`, details: errorText }), {
-        status: response.status,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const errors = {
+        401: "The AI API key is invalid or missing.",
+        402: "The AI account has insufficient credits.",
+        403: "The AI provider denied this request.",
+        429: "The AI provider is busy. Please wait and retry.",
+      };
+      return Response.json(
+        {
+          error:
+            errors[response.status] ||
+            "The AI provider could not complete this request.",
+        },
+        { status: response.status },
+      );
     }
 
     // Return the readable stream directly to the client
     return new Response(response.body, {
       headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
     });
-
   } catch (error) {
-    console.error('Chat API Route Error:', error);
-    return new Response(JSON.stringify({ error: 'Internal Server Error' }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.error("Chat API request failed:", error.name);
+    return new Response(
+      JSON.stringify({
+        error:
+          error.name === "TimeoutError"
+            ? "The AI service timed out. Please retry."
+            : "The AI service is unavailable. Check the server connection and API settings.",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

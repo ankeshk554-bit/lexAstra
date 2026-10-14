@@ -14,7 +14,7 @@ export const metadata = {
     template: "%s | LexAstra",
   },
   description:
-    "India's most trusted legal study platform. Access 500+ Bare Acts, 10,000+ case summaries, exam preparation for Judiciary, CLAT, CUET, APO, and AI-powered legal assistance.",
+    "An Indian law study workspace with bare acts, landmark case summaries, exam syllabuses, a PDF reader and AI-assisted study.",
   keywords: [
     "Indian law",
     "bare acts",
@@ -31,7 +31,7 @@ export const metadata = {
   openGraph: {
     title: "LexAstra — Every Law. Every Case. Every Exam.",
     description:
-      "India's most trusted legal study platform for law students.",
+      "A focused workspace for studying Indian law.",
     type: "website",
     locale: "en_IN",
     siteName: "LexAstra",
@@ -40,7 +40,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "LexAstra — India's Definitive Legal Study Platform",
     description:
-      "Access 500+ Bare Acts, 10,000+ case summaries, and AI-powered exam prep.",
+      "Read Indian statutes, explore case summaries and prepare for law examinations.",
   },
   robots: {
     index: true,
@@ -52,15 +52,10 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${cormorantGaramond.variable} ${lora.variable} ${dmMono.variable} ${outfit.variable}`}
     >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Lora:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
         {/* Google Analytics placeholder */}
         {/* <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script> */}
         <script

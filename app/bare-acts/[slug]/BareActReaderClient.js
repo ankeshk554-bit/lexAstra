@@ -209,8 +209,9 @@ export default function BareActReaderClient({ act }) {
   };
 
   // Copy statutory text to clipboard
-  const handleCopyText = (secNum, text) => {
-    navigator.clipboard.writeText(text);
+  const handleCopyText = async (secNum, text) => {
+    try { await navigator.clipboard.writeText(text); }
+    catch { alert('Copy is unavailable. Select the text and copy it manually.'); return; }
     setCopiedSection(secNum);
     setTimeout(() => {
       setCopiedSection(null);
@@ -234,7 +235,7 @@ export default function BareActReaderClient({ act }) {
       const sub = Object.values(cpcSubheaders)
         .flatMap((groups) => groups)
         .find((g) => g.title === selectedSubheader);
-      
+
       if (sub) {
         list = list.filter((sec) => {
           const numVal = getSectionNumericVal(sec.number);
@@ -274,11 +275,11 @@ export default function BareActReaderClient({ act }) {
       {/* Styles Block for Premium India Code Layout */}
       <style jsx>{`
         .act-workspace {
-          --glass-bg: #0B1F3A;
-          --glass-border: rgba(201, 168, 76, 0.25);
+          --glass-bg: #18372f;
+          --glass-border: #ced9c3;
           --white: #ffffff;
           --white-dim: rgba(255, 255, 255, 0.75);
-          --gold-bright: #C9A84C;
+          --gold-bright: #dfc491;
           --gold-glow: rgba(201, 168, 76, 0.3);
           --navy-deep: #060f1d;
           --navy-mid: #132d52;
@@ -332,7 +333,7 @@ export default function BareActReaderClient({ act }) {
           border: none;
           color: var(--navy-deep);
           opacity: 0.6;
-          font-family: var(--font-primary);
+          font-family: var(--font-ui);
           font-size: var(--text-sm);
           font-weight: 600;
           padding: var(--space-sm) var(--space-md);
@@ -368,7 +369,7 @@ export default function BareActReaderClient({ act }) {
 
         .dual-pane-layout {
           display: grid;
-          grid-template-columns: 300px 1fr;
+          grid-template-columns: 260px minmax(0, 1fr);
           gap: var(--space-xl);
           align-items: start;
         }
@@ -489,8 +490,8 @@ export default function BareActReaderClient({ act }) {
 
         /* Right Panel Sections Grid - Styled Light for high readability */
         .workspace-content {
-          --glass-bg: #F5F2EB;
-          --glass-border: #D1C4A5;
+          --glass-bg: #f6f8f2;
+          --glass-border: #d6dfcd;
           --white: #060f1d;
           --white-dim: #333333;
           --gold-bright: #8C6D1F;
@@ -530,13 +531,14 @@ export default function BareActReaderClient({ act }) {
           color: var(--white);
           padding: 6px var(--space-sm);
           border-radius: 6px;
-          font-family: var(--font-primary);
+          font-family: var(--font-ui);
           cursor: pointer;
         }
 
         .search-wrapper {
           position: relative;
-          min-width: 250px;
+          min-width: 0;
+          width: min(100%, 330px);
         }
 
         .search-input {
@@ -547,7 +549,7 @@ export default function BareActReaderClient({ act }) {
           padding: var(--space-xs) var(--space-sm);
           padding-left: var(--space-lg);
           border-radius: 6px;
-          font-family: var(--font-primary);
+          font-family: var(--font-ui);
           font-size: var(--text-sm);
         }
 
@@ -588,7 +590,7 @@ export default function BareActReaderClient({ act }) {
           color: var(--white);
           text-align: left;
           cursor: pointer;
-          font-family: var(--font-primary);
+          font-family: var(--font-ui);
           font-weight: 500;
           font-size: var(--text-sm);
         }
@@ -605,7 +607,7 @@ export default function BareActReaderClient({ act }) {
           color: var(--gold-bright);
           padding: 3px 8px;
           border-radius: 4px;
-          font-family: var(--font-primary);
+          font-family: var(--font-ui);
           font-weight: 700;
           font-size: var(--text-xs);
           min-width: 90px;
@@ -620,8 +622,8 @@ export default function BareActReaderClient({ act }) {
 
         .section-text-container {
           color: var(--white-dim);
-          font-size: var(--text-sm);
-          line-height: 1.6;
+          font-size: 1rem;
+          line-height: 1.85;
           margin-bottom: var(--space-md);
         }
 
@@ -733,8 +735,8 @@ export default function BareActReaderClient({ act }) {
 
         /* Styled Light for high readability */
         .details-viewer-pane {
-          --glass-bg: #F5F2EB;
-          --glass-border: #D1C4A5;
+          --glass-bg: #f6f8f2;
+          --glass-border: #d6dfcd;
           --white: #060f1d;
           --white-dim: #333333;
           --gold-bright: #8C6D1F;
@@ -758,8 +760,8 @@ export default function BareActReaderClient({ act }) {
           padding: var(--space-xl);
           color: #2b2b2b;
           font-family: 'Georgia', serif;
-          font-size: var(--text-sm);
-          line-height: 1.6;
+          font-size: 1rem;
+          line-height: 1.85;
           white-space: pre-wrap;
           box-shadow: inset 0 0 20px rgba(0,0,0,0.02);
           overflow-x: auto;
@@ -777,7 +779,7 @@ export default function BareActReaderClient({ act }) {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
           <div>
-            <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, fontFamily: 'var(--font-primary)' }}>{act.name}</h1>
+            <h1 style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, fontFamily: 'var(--font-ui)' }}>{act.name}</h1>
             <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-xs)' }}>
               <span className="card__tag" style={{ background: 'var(--gold-bright)', color: 'var(--navy-deep)' }}>{act.category}</span>
               <span className="section-number">Enacted: {act.year}</span>
@@ -896,6 +898,7 @@ export default function BareActReaderClient({ act }) {
                       <button
                         onClick={() => toggleSection(sec.number)}
                         className="section-header-row"
+                        aria-expanded={isExpanded}
                       >
                         <div className="section-header-left">
                           <span className="section-badge-id">{sectionLabel} {sec.number}</span>
@@ -1012,7 +1015,7 @@ export default function BareActReaderClient({ act }) {
                   <h3 style={{ fontSize: 'var(--text-xl)', color: 'var(--gold-bright)' }}>
                     {selectedOrder.number}: {selectedOrder.title}
                   </h3>
-                  
+
                   {/* Rule Search Box */}
                   <div className="search-wrapper" style={{ minWidth: '200px' }}>
                     <span className="search-icon">🔍</span>
@@ -1028,7 +1031,7 @@ export default function BareActReaderClient({ act }) {
 
                 <div className="rules-accordion-list" style={{ marginTop: 'var(--space-sm)', display: 'flex', flexDirection: 'column', gap: 'var(--space-xxs)' }}>
                   {(() => {
-                    const filteredRules = selectedOrder.rules.filter(r => 
+                    const filteredRules = selectedOrder.rules.filter(r =>
                       String(r.number).toLowerCase().includes(ruleSearchQuery.toLowerCase()) ||
                       String(r.title).toLowerCase().includes(ruleSearchQuery.toLowerCase()) ||
                       String(r.text).toLowerCase().includes(ruleSearchQuery.toLowerCase())
@@ -1042,6 +1045,7 @@ export default function BareActReaderClient({ act }) {
                             <button
                               onClick={() => toggleRule(rule.number)}
                               className="section-header-row"
+                        aria-expanded={isExpanded}
                             >
                               <div className="section-header-left">
                                 <span className="section-badge-id" style={{ minWidth: '80px', textAlign: 'center' }}>Rule {rule.number}</span>

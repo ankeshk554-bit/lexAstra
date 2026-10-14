@@ -7,7 +7,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Download, Maximize2, X, Code } from 'lucide
 const minimalClean = (code) => {
   if (!code) return '';
   let s = code.replace(/```mermaid\s*/gi, '').replace(/```/g, '').trim();
-  
+
   // Ensure valid declaration
   const fl = s.split('\n').find(l => l.trim())?.trim().toLowerCase() || '';
   const kws = ['flowchart','graph','sequencediagram','gantt','classdiagram',
@@ -118,12 +118,12 @@ const stripToBareBones = (code) => {
 
     // Extract node IDs connected by arrows
     const parts = simplified.split(/(-->|-.->|==>)/).map(p => p.trim()).filter(Boolean);
-    
+
     for (let i = 0; i < parts.length - 2; i += 2) {
       const src = parts[i].replace(/[^A-Za-z0-9_-]/g, '').trim();
       const arrow = parts[i + 1];
       const dst = parts[i + 2]?.replace(/[^A-Za-z0-9_-]/g, '').trim();
-      
+
       if (src && dst && arrow) {
         const safeSrc = /^(end|subgraph|style|class)$/i.test(src) ? 'nd_' + src : src;
         const safeDst = /^(end|subgraph|style|class)$/i.test(dst) ? 'nd_' + dst : dst;
@@ -147,7 +147,7 @@ const stripToBareBones = (code) => {
 export default function MermaidDiagram({ chart }) {
   const [svg, setSvg] = useState('');
   const [showRawCode, setShowRawCode] = useState(false);
-  const [renderPass, setRenderPass] = useState(0); 
+  const [renderPass, setRenderPass] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [baseWidth, setBaseWidth] = useState(0);
@@ -165,56 +165,19 @@ export default function MermaidDiagram({ chart }) {
     });
   };
 
-  // Auto-fit calculation when SVG rendered or container width changes
   useEffect(() => {
     if (!svg) return;
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(svg, 'image/svg+xml');
-      const svgEl = doc.documentElement;
-      const viewBox = svgEl.getAttribute('viewBox');
-      let width = 800; // fallback
-      if (viewBox) {
-        const parts = viewBox.split(/\s+/);
-        const w = parseFloat(parts[2]);
-        if (!isNaN(w)) width = w;
-      } else {
-        const widthAttr = svgEl.getAttribute('width');
-        if (widthAttr) {
-          const w = parseFloat(widthAttr);
-          if (!isNaN(w)) width = w;
-        }
-      }
+    const element = isFullscreen ? fullscreenContainerRef.current : containerRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      const width = Number(doc.documentElement.getAttribute('viewBox')?.split(/\s+/)[2]) || 800;
       setBaseWidth(width);
-
-      // Auto-fit inside main container
-      if (containerRef.current) {
-        const parentWidth = containerRef.current.clientWidth - 48; // container padding
-        if (parentWidth > 0 && width > parentWidth) {
-          const fitZoom = Math.max(0.1, Math.min(1, parentWidth / width));
-          setZoom(Math.round(fitZoom * 100) / 100);
-        } else {
-          setZoom(1.0);
-        }
-      }
-    } catch (e) {
-      console.error("[MermaidDiagram] Error parsing SVG width:", e);
-    }
-  }, [svg]);
-
-  // Recalculate zoom when entering fullscreen
-  useEffect(() => {
-    if (!isFullscreen || !svg || !baseWidth) return;
-    if (fullscreenContainerRef.current) {
-      const parentWidth = fullscreenContainerRef.current.clientWidth - 96; // fullscreen padding
-      if (parentWidth > 0 && baseWidth > parentWidth) {
-        const fitZoom = Math.max(0.1, Math.min(1, parentWidth / baseWidth));
-        setZoom(Math.round(fitZoom * 100) / 100);
-      } else {
-        setZoom(1.0);
-      }
-    }
-  }, [isFullscreen, svg, baseWidth]);
+      setZoom(Math.max(0.1, Math.min(1, (element.clientWidth - 48) / width)));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [svg, isFullscreen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -223,10 +186,10 @@ export default function MermaidDiagram({ chart }) {
     const attemptRender = async (chartCode, renderId) => {
       const mod = await import('mermaid');
       mermaidInstance = mod.default || mod;
-      
+
       mermaidInstance.initialize({
         startOnLoad: false,
-        securityLevel: 'loose',
+        securityLevel: 'strict',
         theme: 'base',
         themeVariables: {
           primaryColor: '#0B1F3A',
@@ -267,13 +230,13 @@ export default function MermaidDiagram({ chart }) {
           console.log(`[MermaidDiagram] Pass ${i} (${pass.name}):\n`, chartCode);
 
           const result = await attemptRender(chartCode, rid);
-          
+
           if (isMounted && result) {
             setSvg(result);
             setRenderPass(i);
             setShowRawCode(false);
             console.log(`[MermaidDiagram] Pass ${i} (${pass.name}) succeeded`);
-            return; 
+            return;
           }
         } catch (err) {
           console.warn(`[MermaidDiagram] Pass ${i} (${pass.name}) failed:`, err.message);
@@ -431,7 +394,7 @@ export default function MermaidDiagram({ chart }) {
           stroke: #C9A84C !important;
           stroke-width: 1.5px !important;
         }
-        
+
         /* 2. Force text and HTML labels inside to be white with high specificity */
         .mermaid-scroll-container text,
         .mermaid-scroll-container text tspan,
@@ -460,7 +423,7 @@ export default function MermaidDiagram({ chart }) {
           color: #ffffff !important;
           background: transparent !important;
         }
-        
+
         /* 4. Force arrow path styling (gold lines) */
         .mermaid-scroll-container .edgePath .path,
         .mermaid-scroll-container path.flowchart-link {
@@ -468,7 +431,7 @@ export default function MermaidDiagram({ chart }) {
           stroke-width: 1.5px !important;
           fill: none !important;
         }
-        
+
         /* 5. Force arrow head markers to be gold */
         .mermaid-scroll-container marker path {
           fill: #C9A84C !important;

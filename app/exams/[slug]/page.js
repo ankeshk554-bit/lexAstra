@@ -1,6 +1,7 @@
 import { exams } from '@/data/exams';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import SyllabusTracker from '@/components/SyllabusTracker';
 import ExamDetailClient from './ExamDetailClient';
 
 export async function generateStaticParams() {
@@ -82,47 +83,10 @@ export default async function ExamPage({ params }) {
 
           <hr className="gold-rule" />
 
-          {/* Syllabus Section */}
-          <div className="syllabus-section">
-            <div className="section-header" style={{ textAlign: 'left', marginBottom: 'var(--space-xl)' }}>
-              <h2>Complete Syllabus</h2>
-            </div>
-            {exam.syllabus.map((paper, i) => (
-              <div key={i} className="syllabus-paper">
-                <div className="syllabus-paper__header">
-                  {paper.paper}
-                </div>
-                <div className="syllabus-paper__body">
-                  {paper.subjects.map((subject, j) => (
-                    <div key={j} className="syllabus-subject">
-                      <h4>{subject.name}</h4>
-                      <ul className="syllabus-subject__topics">
-                        {subject.topics.map((topic, k) => (
-                          <li key={k}>{topic}</li>
-                        ))}
-                      </ul>
-                      {subject.relatedActs && subject.relatedActs.length > 0 && (
-                        <div style={{ marginTop: 'var(--space-sm)', paddingLeft: 'var(--space-lg)' }}>
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', marginRight: '8px' }}>Related Acts:</span>
-                          {subject.relatedActs.map(actSlug => (
-                            <Link key={actSlug} href={`/bare-acts/${actSlug}`} className="card__tag" style={{ marginRight: '4px', textDecoration: 'none' }}>
-                              {actSlug.replace(/-/g, ' ')}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <hr className="gold-rule" />
-
+          <SyllabusTracker exam={exam} />
           {/* Interactive Client Component for PYQs and Cases */}
           <ExamDetailClient exam={exam} />
-          
+
         </div>
       </section>
     </div>

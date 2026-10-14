@@ -1,306 +1,176 @@
-'use client';
-
-import Image from 'next/image';
-import Link from 'next/link';
-import Marquee from '@/components/Marquee';
-import CountUpStats from '@/components/CountUpStats';
-
-const features = [
+import Link from "next/link";
+import {
+  ArrowRight,
+  BookOpen,
+  Scale,
+  GraduationCap,
+  FileText,
+  Sparkles,
+  Newspaper,
+} from "lucide-react";
+import { actAliases } from '@/utils/actAliases';
+import StudySearch from "@/components/StudySearch";
+import { bareActs } from "@/data/bareActs";
+import { caseLaw } from "@/data/caseLaw";
+import { exams } from "@/data/exams";
+const tools = [
   {
-    icon: '📚',
-    title: 'Bare Acts Library',
-    description: 'Access 500+ bare acts including the new BNS 2023, BNSS 2023, and BSA 2023 with section-by-section navigation.',
+    href: "/bare-acts",
+    icon: BookOpen,
+    label: "01 / LEGISLATION",
+    title: "Read the law",
+    text: "Search provisions, navigate chapters and compare the old and new criminal laws.",
+    action: "Explore bare acts",
   },
   {
-    icon: '⚖️',
-    title: 'Case Law Repository',
-    description: '10,000+ case summaries with accurate AIR/SCC citations, ratio decidendi, and exam relevance tags.',
+    href: "/case-law",
+    icon: Scale,
+    label: "02 / JUDGMENTS",
+    title: "Understand the precedent",
+    text: "Find the holding, citation and exam relevance of landmark Indian judgments.",
+    action: "Browse case summaries",
   },
   {
-    icon: '🎯',
-    title: 'Exam Prep Hub',
-    description: 'Complete preparation for Judiciary, CLAT, CUET, and APO exams with syllabuses, PYQs, and strategy.',
+    href: "/exams",
+    icon: GraduationCap,
+    label: "03 / PREPARATION",
+    title: "Build your study plan",
+    text: "Work through your syllabus, track completed topics and practise exam questions.",
+    action: "Choose your exam",
   },
   {
-    icon: '🤖',
-    title: 'AI Legal Assistant',
-    description: 'Get instant answers to legal questions powered by advanced AI, trained specifically for Indian law.',
-  },
-  {
-    icon: '📝',
-    title: 'Syllabus Tracker',
-    description: 'Track your exam preparation progress with subject-wise syllabus breakdowns and recommended resources.',
-  },
-  {
-    icon: '📰',
-    title: 'Legal Current Affairs',
-    description: 'Weekly updates on Supreme Court judgments, new legislation, and constitutional developments.',
-  },
-];
-
-const examTiles = [
-  {
-    slug: 'judiciary',
-    name: 'Judiciary Exam',
-    description: 'Civil Judge / Judicial Magistrate',
-    stats: { seats: '~2000/yr', difficulty: 'Very High', subjects: 'Civil + Criminal + Constitutional' },
-  },
-  {
-    slug: 'apo',
-    name: 'APO',
-    description: 'Assistant Public Prosecutor',
-    stats: { seats: 'Varies by state', difficulty: 'High', subjects: 'Criminal Law + Procedure' },
-  },
-  {
-    slug: 'clat-ug',
-    name: 'CLAT UG',
-    description: 'Common Law Admission Test — Undergraduate',
-    stats: { seats: '~3000+', difficulty: 'Moderate', subjects: 'English + GK + Legal Reasoning + Quantitative' },
-  },
-  {
-    slug: 'clat-pg',
-    name: 'CLAT PG',
-    description: 'Common Law Admission Test — Postgraduate (LLM)',
-    stats: { seats: '~800+', difficulty: 'High', subjects: 'Constitutional + Jurisprudence + All Core Law' },
-  },
-  {
-    slug: 'cuet-ug',
-    name: 'CUET UG',
-    description: 'For Law Undergraduate Admissions',
-    stats: { seats: 'University-wise', difficulty: 'Moderate', subjects: 'Domain + General Test + Language' },
-  },
-  {
-    slug: 'cuet-pg',
-    name: 'CUET PG',
-    description: 'For LLM Admissions via CUET',
-    stats: { seats: 'University-wise', difficulty: 'Moderate-High', subjects: 'Law Domain Knowledge' },
+    href: "/pdf-reader",
+    icon: FileText,
+    label: "04 / YOUR DOCUMENTS",
+    title: "Make reading active",
+    text: "Open a PDF, search its text, highlight provisions and keep your notes in one workspace.",
+    action: "Open PDF workspace",
   },
 ];
-
-const trendingCases = [
-  {
-    name: 'State of Punjab v. Davinder Singh',
-    citation: '2024 SCC OnLine SC 1898',
-    court: 'Supreme Court',
-    subject: 'Constitutional',
-    snippet: 'Sub-classification within Scheduled Castes for reservation purposes is permissible.',
-  },
-  {
-    name: 'Association for Democratic Reforms v. Union of India',
-    citation: '2024 SCC OnLine SC 150',
-    court: 'Supreme Court',
-    subject: 'Constitutional',
-    snippet: 'Electoral Bonds Scheme struck down as unconstitutional.',
-  },
-  {
-    name: 'Mineral Area Development Authority v. Steel Authority of India',
-    citation: '2024 SCC OnLine SC 1935',
-    court: 'Supreme Court',
-    subject: 'Constitutional',
-    snippet: 'States have power to levy tax on mineral-bearing lands.',
-  },
-  {
-    name: 'Property Owners Association v. State of Maharashtra',
-    citation: '2024 SCC OnLine SC 1907',
-    court: 'Supreme Court',
-    subject: 'Constitutional',
-    snippet: 'Private property can be considered community resource under Article 39(b).',
-  },
-  {
-    name: 'In Re: Article 370 of the Constitution',
-    citation: '2023 SCC OnLine SC 1647',
-    court: 'Supreme Court',
-    subject: 'Constitutional',
-    snippet: 'Abrogation of Article 370 upheld — J&K\'s special status was temporary.',
-  },
-];
-
 export default function HomePage() {
+  const items = [
+    ...bareActs.map((a) => ({
+      kind: "Bare act",
+      title: a.name,
+      keywords: `${actAliases[a.slug] || ''} ${a.year} ${a.description}`,
+      href: `/bare-acts/${a.slug}`,
+    })),
+    ...caseLaw.map((c) => ({
+      kind: "Case law",
+      title: c.name,
+      keywords: c.citation + " " + c.ratio,
+      href: `/case-law/${c.id}`,
+    })),
+    ...exams.map((e) => ({
+      kind: "Exam",
+      title: e.name,
+      keywords: e.fullName,
+      href: `/exams/${e.slug}`,
+    })),
+  ];
   return (
-    <div className="page-enter">
-      {/* ===== HERO SECTION ===== */}
-      <section className="hero" id="hero">
-        <Image
-          src="/ashoka-chakra.svg"
-          alt=""
-          width={600}
-          height={600}
-          className="hero__chakra"
-          priority
-          aria-hidden="true"
-        />
-        <div className="hero__content">
-          <h1 className="hero__title">
-            {['Every', 'Bare', 'Act.', 'Every', 'Landmark', 'Case.', 'Every', 'Exam', '—', 'One', 'Platform.'].map(
-              (word, i) => (
-                <span
-                  key={i}
-                  className="hero__word"
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                >
-                  {word}{' '}
-                </span>
-              )
-            )}
-          </h1>
-          <p className="hero__subtitle">
-            Built for Indian law students. Trusted for accuracy.
+    <div className="study-home">
+      <section className="study-hero container">
+        <div className="study-hero__copy">
+          <p className="eyebrow">
+            <span /> YOUR INDIAN LAW STUDY DESK
           </p>
-          <div className="hero__actions">
-            <Link href="/bare-acts" className="btn btn--primary" id="cta-explore">
-              📚 Explore Library
+          <h1>
+            Less searching.
+            <br />
+            More <em>understanding.</em>
+          </h1>
+          <p className="study-hero__description">
+            The law, the cases, and your next exam. A focused workspace to
+            connect what you read with what you need to learn.
+          </p>
+          <div className="study-hero__actions">
+            <Link href="/bare-acts" className="btn btn--primary">
+              Start with the law <ArrowRight size={17} />
             </Link>
-            <Link href="/ai-assistant" className="btn btn--gold" id="cta-ai">
-              ✦ Ask AI Anything
+            <Link href="/exams" className="btn btn--ghost">
+              Find my exam
             </Link>
           </div>
-        </div>
-      </section>
-
-      {/* ===== MARQUEE ===== */}
-      <Marquee />
-
-      {/* ===== STATS BAR ===== */}
-      <CountUpStats />
-
-      <hr className="gold-rule" />
-
-      {/* ===== FEATURE CARDS ===== */}
-      <section className="section" id="features">
-        <div className="container">
-          <div className="section-header">
-            <h2>Your Complete Legal Arsenal</h2>
-            <p>Everything you need to master Indian law, in one platform.</p>
+          <div className="study-hero__counts">
+            <span>
+              <strong>{bareActs.length}</strong> Acts in the library
+            </span>
+            <span>
+              <strong>{caseLaw.length}</strong> Case summaries
+            </span>
+            <span>
+              <strong>{exams.length}</strong> Exam guides
+            </span>
           </div>
-          <div className="feature-grid">
-            {features.map((feat, i) => (
-              <div key={i} className="card" id={`feature-${i}`}>
-                <span className="card__icon">{feat.icon}</span>
-                <h3 className="card__title">{feat.title}</h3>
-                <p className="card__description">{feat.description}</p>
+        </div>
+        <StudySearch items={items} />
+      </section>
+      <section className="container study-tools">
+        <div className="study-section-heading">
+          <div>
+            <p className="eyebrow">A CLEAR PATH THROUGH YOUR STUDIES</p>
+            <h2>What are you working on?</h2>
+          </div>
+          <span>Choose a task. Get straight to work.</span>
+        </div>
+        <div className="study-tool-grid">
+          {tools.map(({ icon: Icon, ...t }) => (
+            <Link href={t.href} key={t.href} className="study-tool">
+              <div className="study-tool__top">
+                <span className="study-tool__icon">
+                  <Icon size={24} />
+                </span>
+                <ArrowRight size={19} />
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <hr className="gold-rule" />
-
-      {/* ===== EXAM QUICK-ACCESS ===== */}
-      <section className="section" id="exam-access">
-        <div className="container">
-          <div className="section-header">
-            <h2>Exam Preparation</h2>
-            <p>Choose your exam. Master the syllabus. Conquer the competition.</p>
-          </div>
-          <div className="exam-grid">
-            {examTiles.map((exam) => (
-              <div key={exam.slug} className="exam-tile" id={`exam-${exam.slug}`}>
-                <div className="exam-tile__inner">
-                  <div className="exam-tile__front">
-                    <h3>{exam.name}</h3>
-                    <p>{exam.description}</p>
-                    <span className="card__tag">{exam.slug.replace(/-/g, ' ').toUpperCase()}</span>
-                  </div>
-                  <div className="exam-tile__back">
-                    <h4>{exam.name}</h4>
-                    <p><strong>Seats:</strong> {exam.stats.seats}</p>
-                    <p><strong>Difficulty:</strong> {exam.stats.difficulty}</p>
-                    <p><strong>Key Subjects:</strong> {exam.stats.subjects}</p>
-                    <Link href={`/exams/${exam.slug}`} className="btn btn--gold btn--small">
-                      View Syllabus →
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <hr className="gold-rule" />
-
-      {/* ===== TRENDING CASES ===== */}
-      <section className="section" id="trending-cases">
-        <div className="container">
-          <div className="section-header">
-            <h2>Trending Cases</h2>
-            <p>Recent landmark judgments every law student should know.</p>
-          </div>
-          <div className="scroll-strip">
-            {trendingCases.map((c, i) => (
-              <div key={i} className="card" id={`trending-${i}`}>
-                <span className="card__tag">{c.subject}</span>
-                <h3 className="card__title" style={{ marginTop: '12px', fontSize: '1.1rem' }}>
-                  {c.name}
-                </h3>
-                <p className="section-number" style={{ margin: '8px 0' }}>
-                  {c.citation}
-                </p>
-                <p className="card__meta">{c.court}</p>
-                <p className="card__description" style={{ marginTop: '8px' }}>
-                  {c.snippet}
-                </p>
-                <Link
-                  href="/case-law"
-                  className="btn btn--ghost btn--small"
-                  style={{ marginTop: '12px' }}
-                >
-                  Read Summary →
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <hr className="gold-rule" />
-
-      {/* ===== AI ASSISTANT TEASER ===== */}
-      <section className="section" id="ai-teaser">
-        <div className="container">
-          <div className="ai-teaser">
-            <div className="ai-teaser__info">
-              <span className="card__tag" style={{ marginBottom: '16px', display: 'inline-block' }}>
-                AI-Powered
+              <small>{t.label}</small>
+              <h3>{t.title}</h3>
+              <p>{t.text}</p>
+              <span className="study-tool__action">
+                {t.action} <ArrowRight size={15} />
               </span>
-              <h2>Your AI Legal Research Assistant</h2>
-              <p>
-                Ask any question about Indian law and get instant, well-cited answers.
-                From bare act sections to landmark case analysis, from exam strategy
-                to legal reasoning — LexAstra AI understands Indian law like no other tool.
-              </p>
-              <Link href="/ai-assistant" className="btn btn--gold-fill">
-                Try the AI Legal Assistant →
-              </Link>
-            </div>
-            <div className="ai-mock-chat">
-              <div className="ai-mock-chat__header">LexAstra AI — Live Preview</div>
-              <div className="ai-mock-msg ai-mock-msg--user">
-                <div className="ai-mock-msg__bubble">
-                  Explain Article 21 with landmark cases
-                </div>
-              </div>
-              <div className="ai-mock-msg ai-mock-msg--ai">
-                <div className="ai-mock-msg__bubble">
-                  <strong>Article 21</strong> of the Constitution of India states:
-                  &ldquo;No person shall be deprived of his life or personal liberty
-                  except according to procedure established by law.&rdquo;
-                  <br /><br />
-                  <strong>Key Landmark Cases:</strong>
-                  <br />
-                  • <span className="section-number">Maneka Gandhi v. UOI (1978)</span> —
-                  Right to life includes right to live with dignity
-                  <br />
-                  • <span className="section-number">Olga Tellis v. BMC (1985)</span> —
-                  Right to livelihood under Art. 21
-                  <br />
-                  • <span className="section-number">Vishaka v. State of Rajasthan (1997)</span> —
-                  Sexual harassment guidelines
-                </div>
-              </div>
-            </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+      <section className="container study-bottom">
+        <div className="study-update">
+          <p className="eyebrow">CRIMINAL LAW TRANSITION</p>
+          <h2>New codes. Connected context.</h2>
+          <p>
+            Study BNS, BNSS and BSA alongside their predecessor laws. Transition
+            notes help you keep the frameworks distinct.
+          </p>
+          <div className="study-code-links">
+            {bareActs
+              .filter((a) => a.isNew)
+              .map((a) => (
+                <Link key={a.id} href={`/bare-acts/${a.slug}`}>
+                  {a.name} <ArrowRight size={16} />
+                </Link>
+              ))}
           </div>
+        </div>
+        <div className="study-companions">
+          <Link href="/ai-assistant">
+            <Sparkles size={22} />
+            <div>
+              <h3>Talk through a legal concept</h3>
+              <p>
+                Use exam-specific prompts with the AI assistant. Requires a
+                configured API key.
+              </p>
+            </div>
+            <ArrowRight size={19} />
+          </Link>
+          <Link href="/current-affairs">
+            <Newspaper size={22} />
+            <div>
+              <h3>Review the legal digest</h3>
+              <p>Curated developments with dates and exam relevance.</p>
+            </div>
+            <ArrowRight size={19} />
+          </Link>
         </div>
       </section>
     </div>

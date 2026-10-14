@@ -1,5 +1,8 @@
 'use client';
 
+import { readAIStream } from '@/utils/aiStream.mjs';
+import { storage } from '@/utils/storage';
+
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -57,7 +60,7 @@ const getExamChips = (mode) => {
     ],
     'Judiciary': [
       "Write a Mains-style answer on Res Judicata under Section 11 CPC",
-      "Explain Section 125 BNSS (Maintenance) with case law",
+      "Explain Section 144 BNSS (Maintenance; formerly Section 125 CrPC) with case law",
       "Essential ingredients of Section 103 BNS with exceptions",
       "Discuss Article 226 vs Article 32 writ jurisdiction"
     ],
@@ -126,6 +129,8 @@ const getExamChips = (mode) => {
 };
 
 const getFollowUpSuggestions = (content, exam) => {
+  const supplied = [...content.matchAll(/\[FOLLOWUP:\s*([^\]]+)\]/g)].map(match => match[1].trim());
+  if (supplied.length) return supplied.slice(0, 3);
   const suggestions = [];
   if (content.includes('Section') || content.includes('section')) {
     suggestions.push('Explain the exceptions to this section');
@@ -153,16 +158,16 @@ const getTextFromChildren = (children) => {
 
 const highlightText = (value) => {
   if (typeof value !== 'string') return value;
-  
+
   const regex = /(\b(?:AIR\s+\d{4}\s+SC\s+\d+|\(\d{4}\)\s+\d+\s+SCC\s+\d+|\d{4}\s+SCC\s+\d+)\b|\b(?:Section\s+\d+[A-Za-z0-9]*(?:\s+of\s+(?:the\s+)?[A-Za-z\s]+,?\s+\d{4})?|Article\s+\d+[A-Za-z0-9]*)\b)/g;
   const parts = value.split(regex);
   if (parts.length === 1) return value;
-  
+
   return parts.map((part, index) => {
     if (index % 2 === 0) {
       return part;
     }
-    
+
     const isCitation = /AIR|SCC/.test(part);
     if (isCitation) {
       return (
@@ -183,20 +188,21 @@ const highlightText = (value) => {
 export default function AIAssistantClient() {
   const [sessions, setSessions] = useState(() => {
     if (typeof window !== 'undefined') {
-      const storedSessions = localStorage.getItem('lexastra_chat_sessions');
+      const storedSessions = storage.getItem('lexastra_chat_sessions');
       if (storedSessions) {
         if (!storedSessions.includes('"data: {"') && !storedSessions.includes('"index":0,"delta"')) {
           try {
             const parsed = JSON.parse(storedSessions);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              return parsed.filter(s => s && typeof s === 'object' && s.id);
+              const valid = parsed.filter(s => s && typeof s.id === 'string' && Array.isArray(s.messages) && s.messages.every(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string'));
+              if (valid.length) return valid;
             }
           } catch (e) {
             console.error('Error parsing stored chat sessions:', e);
-            localStorage.removeItem('lexastra_chat_sessions');
+            storage.removeItem('lexastra_chat_sessions');
           }
         } else {
-          localStorage.removeItem('lexastra_chat_sessions');
+          storage.removeItem('lexastra_chat_sessions');
         }
       }
     }
@@ -211,7 +217,7 @@ export default function AIAssistantClient() {
   const [input, setInput] = useState('');
   const [examMode, setExamMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_exam_mode') || 'General';
+      return storage.getItem('lexastra_exam_mode') || 'General';
     }
     return 'General';
   });
@@ -221,13 +227,13 @@ export default function AIAssistantClient() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_deepseek_api_key') || '';
+      return storage.getItem('lexastra_deepseek_api_key') || '';
     }
     return '';
   });
   const [hasCustomApiKey, setHasCustomApiKey] = useState(() => {
     if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('lexastra_deepseek_api_key');
+      return !!storage.getItem('lexastra_deepseek_api_key');
     }
     return false;
   });
@@ -236,10 +242,10 @@ export default function AIAssistantClient() {
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [googleUser, setGoogleUser] = useState(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 900);
   const [isWideMode, setIsWideMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('lexastra_chat_widemode') === 'true';
+      return storage.getItem('lexastra_chat_widemode') === 'true';
     }
     return false;
   });
@@ -255,14 +261,13 @@ export default function AIAssistantClient() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-  
+
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
   const userHasScrolledUp = useRef(false);
   const abortControllerRef = useRef(null);
-  const streamBufferRef = useRef('');
-  const backupFileInputRef = useRef(null);
+    const backupFileInputRef = useRef(null);
 
   if (currentSessionId === null && sessions.length > 0) {
     setCurrentSessionId(sessions[0].id);
@@ -272,6 +277,7 @@ export default function AIAssistantClient() {
   const messages = currentSession.messages || [];
 
   const createNewSession = () => {
+    if (isLoading) stopGeneration();
     const newSession = {
       id: generateId(),
       title: 'New Chat',
@@ -296,39 +302,32 @@ export default function AIAssistantClient() {
     const examSlug = params.get('exam');
     if (examSlug && SLUG_TO_EXAM_MODE[examSlug]) {
       const mode = SLUG_TO_EXAM_MODE[examSlug];
-      setExamMode(mode);
-      localStorage.setItem('lexastra_exam_mode', mode);
+      queueMicrotask(() => setExamMode(mode));
+      storage.setItem('lexastra_exam_mode', mode);
     }
 
     const initialPrompt = params.get('prompt');
     if (initialPrompt) {
-      setTimeout(() => {
-        setInput(initialPrompt);
-      }, 100);
-      setTimeout(() => {
-        const sendBtn = document.getElementById('ai-send-btn');
-        if (sendBtn) sendBtn.click();
-        
-        // Clear url parameters to prevent re-triggering on HMR/reload
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }, 500);
+      queueMicrotask(() => setInput(initialPrompt));
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-    
+
     const checkGoogleUser = () => {
-      const stored = localStorage.getItem('lexastra_google_user');
+      const stored = storage.getItem('lexastra_google_user');
       if (stored) {
         try {
-          setGoogleUser(JSON.parse(stored));
+          const profile = JSON.parse(stored);
+          setGoogleUser(profile && typeof profile.name === 'string' ? profile : null);
         } catch (e) {
           console.error('Error parsing Google user:', e);
-          localStorage.removeItem('lexastra_google_user');
+          storage.removeItem('lexastra_google_user');
           setGoogleUser(null);
         }
       } else {
         setGoogleUser(null);
       }
     };
-    checkGoogleUser();
+    queueMicrotask(checkGoogleUser);
 
     window.addEventListener('google-signin', checkGoogleUser);
     window.addEventListener('google-signout', checkGoogleUser);
@@ -345,55 +344,20 @@ export default function AIAssistantClient() {
     };
   }, []);
 
-  // Profile check hook only
-  useEffect(() => {
-    const checkGoogleUser = () => {
-      const stored = localStorage.getItem('lexastra_google_user');
-      if (stored) {
-        try {
-          setGoogleUser(JSON.parse(stored));
-        } catch (e) {
-          console.error('Error parsing Google user:', e);
-          localStorage.removeItem('lexastra_google_user');
-          setGoogleUser(null);
-        }
-      } else {
-        setGoogleUser(null);
-      }
-    };
-    checkGoogleUser();
-
-    window.addEventListener('google-signin', checkGoogleUser);
-    window.addEventListener('google-signout', checkGoogleUser);
-
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 0);
-
-    return () => {
-      window.removeEventListener('google-signin', checkGoogleUser);
-      window.removeEventListener('google-signout', checkGoogleUser);
-      clearTimeout(timer);
-    };
-  }, []);
-
   // Save sessions to local storage whenever they change
   useEffect(() => {
-    if (sessions.length > 0) {
-      localStorage.setItem('lexastra_chat_sessions', JSON.stringify(sessions));
+    if (sessions.length > 0 && mounted) {
+      storage.setItem('lexastra_chat_sessions', JSON.stringify(sessions));
     }
-  }, [sessions]);
+  }, [sessions, mounted]);
 
   const deleteSession = (e, id) => {
     e.stopPropagation();
-    const updated = sessions.filter(s => s.id !== id);
+    if (isLoading) stopGeneration();
+    const remaining = sessions.filter(s => s.id !== id);
+    const updated = remaining.length ? remaining : [{id:generateId(), title:'New Chat', messages:[], timestamp:getTimestamp()}];
     setSessions(updated);
-    if (updated.length === 0) {
-      createNewSession();
-      localStorage.removeItem('lexastra_chat_sessions');
-    } else if (currentSessionId === id) {
-      setCurrentSessionId(updated[0].id);
-    }
+    if (currentSessionId === id) setCurrentSessionId(updated[0].id);
   };
 
   const handleScroll = () => {
@@ -403,19 +367,14 @@ export default function AIAssistantClient() {
     userHasScrolledUp.current = !isNearBottom;
   };
 
-  const scrollToBottom = () => {
+  const lastMessageContentLength = messages[messages.length - 1]?.content?.length || 0;
+  useEffect(() => {
     if (!userHasScrolledUp.current && chatContainerRef.current) {
-      // Use 'auto' (instant) scrolling during active streaming to prevent 
-      // massive browser lag and jitter, and 'smooth' when finished.
       chatContainerRef.current.style.scrollBehavior = isLoading ? 'auto' : 'smooth';
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  };
-
-  const lastMessageContentLength = messages[messages.length - 1]?.content?.length || 0;
-  useEffect(() => {
-    scrollToBottom();
   }, [lastMessageContentLength, isLoading, currentSessionId]);
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
 
   // Auto-expand textarea
   const handleInput = (e) => {
@@ -429,7 +388,7 @@ export default function AIAssistantClient() {
 
 
   const handleSignOut = () => {
-    localStorage.removeItem('lexastra_google_user');
+    storage.removeItem('lexastra_google_user');
     setGoogleUser(null);
     window.dispatchEvent(new Event('google-signout'));
   };
@@ -437,13 +396,13 @@ export default function AIAssistantClient() {
   const handleExportBackup = () => {
     try {
       const backupData = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode')) {
-          backupData[key] = localStorage.getItem(key);
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key && ((key.startsWith('lexastra_') && !key.includes('api_key') && !key.includes('token')) || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode')) {
+          backupData[key] = storage.getItem(key);
         }
       }
-      
+
       const jsonString = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -462,20 +421,19 @@ export default function AIAssistantClient() {
   const handleImportBackup = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const backupData = JSON.parse(event.target.result);
         let restoredCount = 0;
-        
+
         for (const key in backupData) {
-          if (key.startsWith('lexastra_') || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode') {
-            localStorage.setItem(key, backupData[key]);
-            restoredCount++;
+          if ((key.startsWith('lexastra_') && !key.includes('api_key') && !key.includes('token')) || key === 'lexastra_chat_sessions' || key === 'lexastra_google_user' || key === 'lexastra_exam_mode') {
+            if (typeof backupData[key] === 'string' && storage.setItem(key, backupData[key])) restoredCount++;
           }
         }
-        
+
         if (restoredCount > 0) {
           alert('Backup restored successfully! The page will now reload.');
           window.location.reload();
@@ -489,8 +447,9 @@ export default function AIAssistantClient() {
     reader.readAsText(file);
   };
 
-  const handleCopy = (content, index) => {
-    navigator.clipboard.writeText(content);
+  const handleCopy = async (content, index) => {
+    try { await navigator.clipboard.writeText(content.replace(/\[FOLLOWUP:[^\]]*\]/g, '').trim()); }
+    catch { alert('Copy is unavailable. Select the answer and copy it manually.'); return; }
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
@@ -499,7 +458,7 @@ export default function AIAssistantClient() {
     const html2pdf = (await import('html2pdf.js')).default;
     const element = document.getElementById(`ai-msg-${index}`);
     if (!element) return;
-    
+
     const opt = {
       margin:       10,
       filename:     `LexAstra_AI_Analysis_${Date.now()}.pdf`,
@@ -507,7 +466,7 @@ export default function AIAssistantClient() {
       html2canvas:  { scale: 2, useCORS: true },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    
+
     html2pdf().set(opt).from(element).save();
   };
 
@@ -521,54 +480,43 @@ export default function AIAssistantClient() {
   const handleExamModeChange = (e) => {
     const mode = e.target.value;
     setExamMode(mode);
-    localStorage.setItem('lexastra_exam_mode', mode);
+    storage.setItem('lexastra_exam_mode', mode);
   };
 
   const handleRegenerate = () => {
-    if (isLoading || messages.length < 2) return;
-    // Remove last assistant message and re-send the last user message
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-    if (!lastUserMsg) return;
-    
-    // Remove the last assistant message from session
-    setSessions(prev => prev.map(s => {
-      if (s.id === currentSessionId) {
-        const newMsgs = s.messages.filter((_, i) => i !== s.messages.length - 1);
-        return { ...s, messages: newMsgs };
-      }
-      return s;
-    }));
-    
-    // Re-send
-    setTimeout(() => handleSend(lastUserMsg.content), 100);
+    if (isLoading) return;
+    const lastUserIndex = messages.findLastIndex(m => m.role === 'user');
+    if (lastUserIndex < 0) return;
+    handleSend(messages[lastUserIndex].content, messages.slice(0, lastUserIndex));
   };
 
-  const handleSend = async (text) => {
+  const handleSend = async (text, history = messages) => {
     if (!text.trim() || isLoading) return;
 
     userHasScrolledUp.current = false;
     const userMessage = { role: 'user', content: text };
-    
+
     // Auto-generate title if it's the first message
     let sessionTitle = currentSession.title;
     if (messages.length === 0) {
       sessionTitle = text.length > 30 ? text.substring(0, 30) + '...' : text;
     }
 
-    const updatedMessages = [...messages, userMessage];
-    
-    setSessions(prev => prev.map(s => 
+    const updatedMessages = [...history, userMessage];
+
+    setSessions(prev => prev.map(s =>
       s.id === currentSessionId ? { ...s, messages: updatedMessages, title: sessionTitle } : s
     ));
-    
+
     setInput('');
     if (inputRef.current) inputRef.current.style.height = 'auto';
     setIsLoading(true);
 
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
-      const customKey = localStorage.getItem('lexastra_deepseek_api_key') || '';
+      const customKey = storage.getItem('lexastra_deepseek_api_key') || '';
       const headers = {
         'Content-Type': 'application/json',
       };
@@ -580,98 +528,25 @@ export default function AIAssistantClient() {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ messages: updatedMessages, examMode }),
-        signal: abortControllerRef.current.signal
+        signal: controller.signal
       });
 
       if (!response.ok) {
-        setIsLoading(false);
-        let errorMsg = `API request failed (Status: ${response.status}).`;
-        if (response.status === 400) {
-          errorMsg = 'Bad Request (Status 400). Please check your query or verify if your custom API key format is correct.';
-        } else if (response.status === 401) {
-          errorMsg = 'Authentication failed. Please verify that your custom DeepSeek API key is correct and valid, or configure it via the **DeepSeek API Settings** in the sidebar.';
-        } else if (response.status === 402) {
-          errorMsg = 'Insufficient Balance. The DeepSeek API key has run out of credits or has no active balance. Please configure a custom DeepSeek API key with active credits via the **DeepSeek API Settings** in the sidebar.';
-        } else if (response.status === 403) {
-          errorMsg = 'Forbidden (Status 403). Access denied. Please ensure your API key has the correct permissions and your IP/region is allowed by DeepSeek.';
-        } else if (response.status === 429) {
-          errorMsg = 'Too Many Requests (Status 429). Rate limit exceeded. Please wait a moment before trying again.';
-        } else if (response.status >= 500) {
-          errorMsg = `Server Error (Status ${response.status}). The DeepSeek service might be experiencing temporary issues. Please try again later.`;
-        }
-        
-        const isKeyRelated = [400, 401, 402, 403].includes(response.status);
-        if (isKeyRelated && response.status !== 401 && response.status !== 402) {
-          errorMsg += ' You can update or clear your custom key via the **DeepSeek API Settings** in the sidebar.';
-        }
-
-        setSessions(prev => prev.map(s => {
-          if (s.id === currentSessionId) {
-            return {
-              ...s,
-              messages: [
-                ...updatedMessages,
-                { role: 'assistant', content: errorMsg }
-              ]
-            };
-          }
-          return s;
-        }));
+        const data = await response.json().catch(() => ({}));
+        const errorMsg = typeof data.error === 'string' ? data.error : `The AI request failed (${response.status}). Please retry.`;
+        setSessions(prev => prev.map(session => session.id === currentSessionId ? {...session, messages:[...updatedMessages,{role:'assistant',content:errorMsg}]} : session));
         return;
       }
 
       // Add empty assistant message
-      setSessions(prev => prev.map(s => 
+      setSessions(prev => prev.map(s =>
         s.id === currentSessionId ? { ...s, messages: [...updatedMessages, { role: 'assistant', content: '' }] } : s
       ));
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      streamBufferRef.current = '';
-      let buffer = '';
-      
-      let lastUpdateTime = getTimestamp();
+      await readAIStream(response, text => !controller.signal.aborted && setSessions(prev => prev.map(session =>
+        session.id === currentSessionId ? {...session, messages: [...updatedMessages, {role:'assistant', content:text}]} : session
+      )));
 
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('data: ')) {
-              const dataStr = trimmedLine.slice(6);
-              if (dataStr === '[DONE]') continue;
-              try {
-                const data = JSON.parse(dataStr);
-                const content = data.choices[0]?.delta?.content || '';
-                streamBufferRef.current += content;
-              } catch (e) {
-                // Ignore incomplete JSON chunks
-              }
-            }
-          }
-          
-          const now = getTimestamp();
-          if (now - lastUpdateTime > 50 || done) {
-            const currentText = streamBufferRef.current;
-            setSessions(prev => prev.map(s => {
-              if (s.id === currentSessionId) {
-                const newMsgs = [...s.messages];
-                newMsgs[newMsgs.length - 1].content = currentText;
-                return { ...s, messages: newMsgs };
-              }
-              return s;
-            }));
-            lastUpdateTime = now;
-          }
-        }
-      }
-      
     } catch (error) {
       if (error.name === 'AbortError') {
         console.log('Generation stopped by user');
@@ -686,8 +561,10 @@ export default function AIAssistantClient() {
         }));
       }
     } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
+      if (abortControllerRef.current === controller) {
+        setIsLoading(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -742,7 +619,7 @@ export default function AIAssistantClient() {
     text({ value }) {
       return <>{highlightText(value)}</>;
     },
-    table({ children }) { 
+    table({ children }) {
       return (
         <div style={{ overflowX: 'auto', margin: '24px 0', borderRadius: '8px', border: '1px solid var(--border-gold)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -769,11 +646,11 @@ export default function AIAssistantClient() {
             <button className="btn btn--gold-fill" style={{ flex: 1, justifyContent: 'center' }} onClick={createNewSession}>
               <Plus size={16} /> New Session
             </button>
-            <button 
-              className="btn btn--ghost" 
-              style={{ padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: '500', opacity: 0.7 }} 
+            <button
+              className="btn btn--ghost"
+              style={{ padding: '8px', borderRadius: '8px', fontSize: '11px', fontWeight: '500', opacity: 0.7 }}
               onClick={() => {
-                localStorage.removeItem('lexastra_chat_sessions');
+                storage.removeItem('lexastra_chat_sessions');
                 window.location.reload(true);
               }}
               title="Reset all chat sessions if experiencing issues"
@@ -782,15 +659,15 @@ export default function AIAssistantClient() {
             </button>
           </div>
         </div>
-        
+
         <div className="chat-sidebar__history">
           <div className="chat-history-group">
             <div className="chat-history-group__title">Your Conversations</div>
             {sessions.filter(Boolean).map(session => (
-              <button 
+              <button
                 key={session.id}
                 className={`chat-history-item ${currentSessionId === session.id ? 'chat-history-item--active' : ''}`}
-                onClick={() => setCurrentSessionId(session.id)}
+                onClick={() => { if (isLoading) stopGeneration(); setCurrentSessionId(session.id); if (window.innerWidth < 900) setIsSidebarCollapsed(true); }}
               >
                 <MessageSquare size={14} style={{ flexShrink: 0, marginRight: '10px' }} />
                 <span className="chat-history-item__text">{session.title}</span>
@@ -801,14 +678,14 @@ export default function AIAssistantClient() {
             ))}
           </div>
         </div>
-        
+
         {/* User Profile Card / Local Sign In Prompt */}
         {!googleUser ? (
           <div className="chat-sidebar-signin-card" style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-            <p style={{ margin: 0, fontSize: '12px', opacity: 0.7, marginBottom: '8px' }}>Create a profile to save your workspace progress.</p>
-            <button 
-              onClick={() => setShowLocalProfileModal(true)} 
-              className="btn btn--primary btn--small" 
+            <p style={{ margin: 0, fontSize: '12px', opacity: 0.7, marginBottom: '8px' }}>Progress is saved on this browser. A local profile is optional.</p>
+            <button
+              onClick={() => setShowLocalProfileModal(true)}
+              className="btn btn--primary btn--small"
               style={{ width: '100%', justifyContent: 'center' }}
             >
               Set Up Profile
@@ -817,18 +694,18 @@ export default function AIAssistantClient() {
         ) : (
           <div className="chat-sidebar-user-card">
             <div className="chat-sidebar-user-card__header">
-              <div 
-                style={{ 
-                  width: '36px', 
-                  height: '36px', 
-                  borderRadius: '50%', 
-                  background: '#C9A84C', 
-                  color: '#ffffff', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  fontSize: '14px', 
-                  fontWeight: 'bold', 
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: '#C9A84C',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
                   border: '1px solid var(--gold)',
                   marginRight: '12px',
                   flexShrink: 0
@@ -842,8 +719,8 @@ export default function AIAssistantClient() {
                 <span className="chat-sidebar-user-card__status">✓ Local Profile Active</span>
               </div>
             </div>
-            <button 
-              onClick={handleSignOut} 
+            <button
+              onClick={handleSignOut}
               className="btn btn--ghost btn--small chat-sidebar-user-card__signout"
             >
               Sign Out
@@ -852,16 +729,16 @@ export default function AIAssistantClient() {
         )}
 
         <div className="chat-sidebar__footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button 
+          <button
             onClick={() => setShowApiKeyModal(true)}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: hasCustomApiKey ? '#C9A84C' : 'rgba(255,255,255,0.5)', 
-              cursor: 'pointer', 
-              fontSize: '12px', 
-              textDecoration: 'none', 
-              width: '100%', 
+            style={{
+              background: 'none',
+              border: 'none',
+              color: hasCustomApiKey ? '#C9A84C' : 'rgba(255,255,255,0.5)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              textDecoration: 'none',
+              width: '100%',
               textAlign: 'left',
               display: 'flex',
               alignItems: 'center',
@@ -871,9 +748,9 @@ export default function AIAssistantClient() {
           >
             <Settings size={12} /> {hasCustomApiKey ? 'DeepSeek API Key (Custom)' : 'Configure DeepSeek API Key'}
           </button>
-          
-          <button 
-            onClick={() => setShowBackupModal(true)} 
+
+          <button
+            onClick={() => setShowBackupModal(true)}
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', width: '100%', textAlign: 'left' }}
           >
             Backup & Restore Workspace
@@ -882,12 +759,12 @@ export default function AIAssistantClient() {
       </aside>
 
       {/* Main Chat Area */}
-      <main className={`chat-main ${isWideMode ? 'chat-main--wide' : ''}`}>
+      <section aria-label="AI conversation" className={`chat-main ${isWideMode ? 'chat-main--wide' : ''}`}>
         {/* Workspace Control Header */}
         <div className="chat-header">
           <div className="chat-header__left">
-            <button 
-              className="chat-sidebar-toggle-btn" 
+            <button
+              className="chat-sidebar-toggle-btn"
               onClick={() => setIsSidebarCollapsed(prev => !prev)}
               title={isSidebarCollapsed ? "Show Sidebar (Ctrl+B)" : "Hide Sidebar (Ctrl+B)"}
               aria-label="Toggle Sidebar"
@@ -903,8 +780,8 @@ export default function AIAssistantClient() {
               <span className="exam-mode-badge" data-exam={examMode}>
                 🎯 {examMode === 'General' ? 'General Law' : examMode}
               </span>
-              <select 
-                value={examMode} 
+              <select
+                value={examMode}
                 onChange={handleExamModeChange}
                 className="exam-selector-dropdown"
                 aria-label="Select Exam Mode"
@@ -927,12 +804,12 @@ export default function AIAssistantClient() {
             <div className="chat-header__divider" />
 
             {/* Layout Wide Mode Toggle */}
-            <button 
+            <button
               className={`chat-header__layout-btn ${isWideMode ? 'chat-header__layout-btn--active' : ''}`}
               onClick={() => {
                 setIsWideMode(prev => {
                   const newVal = !prev;
-                  localStorage.setItem('lexastra_chat_widemode', String(newVal));
+                  storage.setItem('lexastra_chat_widemode', String(newVal));
                   return newVal;
                 });
               }}
@@ -952,33 +829,33 @@ export default function AIAssistantClient() {
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.5' }}>
                 Save your workspace progress, including highlights, annotations, notes, and all AI conversation sessions, to a single file. You can upload this file later to restore your work.
               </p>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
-                <button 
-                  className="btn btn--gold-fill" 
-                  onClick={handleExportBackup} 
+                <button
+                  className="btn btn--gold-fill"
+                  onClick={handleExportBackup}
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
                   Export JSON Backup File
                 </button>
-                
-                <button 
-                  className="btn btn--ghost" 
-                  onClick={() => backupFileInputRef.current?.click()} 
+
+                <button
+                  className="btn btn--ghost"
+                  onClick={() => backupFileInputRef.current?.click()}
                   style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--border-subtle)' }}
                 >
                   Restore from Backup File
                 </button>
-                
-                <input 
-                  type="file" 
-                  ref={backupFileInputRef} 
-                  onChange={handleImportBackup} 
-                  accept=".json" 
-                  style={{ display: 'none' }} 
+
+                <input
+                  type="file"
+                  ref={backupFileInputRef}
+                  onChange={handleImportBackup}
+                  accept=".json"
+                  style={{ display: 'none' }}
                 />
               </div>
-              
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button className="btn btn--ghost" onClick={() => setShowBackupModal(false)}>Close</button>
               </div>
@@ -987,13 +864,13 @@ export default function AIAssistantClient() {
             <div className="chat-welcome">
               <h2 style={{ fontSize: '32px', marginBottom: '16px' }}>What legal topic shall we explore?</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>I can assist with case analysis, exam preparation, drafting, or visual flowcharts.</p>
-              
+
               {!googleUser && (
                 <div className="chat-welcome-sync-card" style={{ padding: '20px', background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.15)', borderRadius: '12px', textAlign: 'center', maxWidth: '450px', margin: '20px auto 0 auto' }}>
                   <h4 style={{ color: 'var(--navy)', marginBottom: '8px', fontSize: '16px', fontWeight: 'bold' }}>Create Local Profile</h4>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.4' }}>Set up a local profile username to save your conversations, notes, and textbook highlights inside this browser.</p>
-                  <button 
-                    onClick={() => setShowLocalProfileModal(true)} 
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.4' }}>Your conversations save automatically on this browser. Add an optional local display name to personalise your workspace.</p>
+                  <button
+                    onClick={() => setShowLocalProfileModal(true)}
                     className="btn btn--primary btn--small"
                     style={{ margin: '0 auto' }}
                   >
@@ -1002,7 +879,7 @@ export default function AIAssistantClient() {
                 </div>
               )}
 
-              <div 
+              <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1047,7 +924,7 @@ export default function AIAssistantClient() {
                         ) : (
                           <>
                             <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
-                              {msg.content}
+                              {msg.content.replace(/\[FOLLOWUP:[^\]]*\]/g, '').trim()}
                             </ReactMarkdown>
                             {msg.role === 'assistant' && (msg.content.includes('Authentication failed') || msg.content.includes('Insufficient Balance') || msg.content.includes('API key') || msg.content.includes('API Settings') || msg.content.includes('API Key')) && (
                               <div style={{ marginTop: '16px', background: 'rgba(201, 168, 76, 0.05)', border: '1px solid rgba(201, 168, 76, 0.2)', padding: '16px', borderRadius: '8px' }}>
@@ -1060,7 +937,7 @@ export default function AIAssistantClient() {
                           </>
                         )}
                       </div>
-                      
+
                       {msg.role === 'assistant' && idx === messages.length - 1 && !isLoading && (
                         <div className="chat-msg-actions">
                           <button onClick={() => handleCopy(msg.content, idx)} className="chat-msg-action-btn">
@@ -1113,7 +990,7 @@ export default function AIAssistantClient() {
                   </div>
                 </div>
               )}
-              <div ref={chatContainerRef} style={{ height: '10px' }} />
+              <div ref={messagesEndRef} style={{ height: '10px' }} />
             </>
           )}
         </div>
@@ -1142,7 +1019,7 @@ export default function AIAssistantClient() {
               rows={1}
               disabled={isLoading}
             />
-            <button 
+            <button
               id="ai-send-btn"
               className="chat-send-btn"
               onClick={() => handleSend(input)}
@@ -1170,7 +1047,7 @@ export default function AIAssistantClient() {
             </div>
           </div>
         </div>
-      </main>
+      </section>
 
       {showLocalProfileModal && (
         <div style={{
@@ -1198,7 +1075,7 @@ export default function AIAssistantClient() {
             position: 'relative',
             textAlign: 'left'
           }}>
-            <button 
+            <button
               onClick={() => setShowLocalProfileModal(false)}
               style={{
                 position: 'absolute',
@@ -1213,14 +1090,14 @@ export default function AIAssistantClient() {
             >
               ✕
             </button>
-            
+
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0B1F3A', marginBottom: '8px' }}>
               Create Local Profile
             </h3>
             <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
               Enter your name or email to label your textbook highlights, notes, and AI conversations. These are saved only in this browser — they won&rsquo;t follow you to another device, and clearing your browser data will erase them.
             </p>
-            
+
             <form onSubmit={(e) => {
               e.preventDefault();
               if (!localProfileInput.trim()) return;
@@ -1232,9 +1109,9 @@ export default function AIAssistantClient() {
                 name,
                 email,
                 picture: '',
-                token: 'dummy-token-' + Math.random().toString(36).substring(2, 10)
+                localOnly: true
               };
-              localStorage.setItem('lexastra_google_user', JSON.stringify(profile));
+              storage.setItem('lexastra_google_user', JSON.stringify(profile));
               setGoogleUser(profile);
               setShowLocalProfileModal(false);
               setLocalProfileInput('');
@@ -1244,8 +1121,8 @@ export default function AIAssistantClient() {
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '6px', textTransform: 'uppercase' }}>
                   Name or Email:
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   placeholder="e.g., Ankes or user@email.com"
                   value={localProfileInput}
@@ -1263,10 +1140,10 @@ export default function AIAssistantClient() {
                   autoFocus
                 />
               </div>
-              
-              <button 
-                type="submit" 
-                className="btn btn--gold-fill" 
+
+              <button
+                type="submit"
+                className="btn btn--gold-fill"
                 style={{ width: '100%', justifyContent: 'center', padding: '10px', borderRadius: '8px' }}
               >
                 Create Profile
@@ -1302,7 +1179,7 @@ export default function AIAssistantClient() {
             position: 'relative',
             textAlign: 'left'
           }}>
-            <button 
+            <button
               onClick={() => setShowApiKeyModal(false)}
               style={{
                 position: 'absolute',
@@ -1317,22 +1194,22 @@ export default function AIAssistantClient() {
             >
               ✕
             </button>
-            
+
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0B1F3A', marginBottom: '8px' }}>
               🔑 DeepSeek API Settings
             </h3>
             <p style={{ fontSize: '13px', color: '#555', marginBottom: '20px', lineHeight: '1.4' }}>
-              Configure your own DeepSeek API Key. Your custom key will be stored securely in your browser's local storage and used directly for all AI queries.
+              Configure your own DeepSeek API Key. Your custom key will be stored on this browser; avoid using a shared device and used directly for all AI queries.
             </p>
-            
+
             <form onSubmit={(e) => {
               e.preventDefault();
               const trimmed = apiKeyInput.trim();
               if (trimmed) {
-                localStorage.setItem('lexastra_deepseek_api_key', trimmed);
+                storage.setItem('lexastra_deepseek_api_key', trimmed);
                 setHasCustomApiKey(true);
               } else {
-                localStorage.removeItem('lexastra_deepseek_api_key');
+                storage.removeItem('lexastra_deepseek_api_key');
                 setHasCustomApiKey(false);
               }
               setShowApiKeyModal(false);
@@ -1342,8 +1219,8 @@ export default function AIAssistantClient() {
                 <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#666', marginBottom: '6px', textTransform: 'uppercase' }}>
                   DeepSeek API Key:
                 </label>
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   placeholder="sk-..."
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
@@ -1360,12 +1237,12 @@ export default function AIAssistantClient() {
                   autoFocus
                 />
               </div>
-              
+
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
+                <button
                   type="button"
                   onClick={() => {
-                    localStorage.removeItem('lexastra_deepseek_api_key');
+                    storage.removeItem('lexastra_deepseek_api_key');
                     setApiKeyInput('');
                     setHasCustomApiKey(false);
                     setShowApiKeyModal(false);
@@ -1376,9 +1253,9 @@ export default function AIAssistantClient() {
                 >
                   Clear Key
                 </button>
-                <button 
-                  type="submit" 
-                  className="btn btn--gold-fill" 
+                <button
+                  type="submit"
+                  className="btn btn--gold-fill"
                   style={{ flex: 2, justifyContent: 'center' }}
                 >
                   Save API Key
