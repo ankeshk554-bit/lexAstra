@@ -1,4 +1,5 @@
 import { exams } from "@/data/exams";
+import {validateDocumentSources,documentPrompt} from "@/utils/pdf/aiContext.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,12 @@ export async function POST(req) {
         ? body.fileName.slice(0, 300)
         : "Document";
 
+    if (body.documentSources !== undefined && !validateDocumentSources(body.documentSources)) {
+      return Response.json({error: "Provide one to eight valid document excerpts within the context limit."}, {status: 400});
+    }
+    if (body.task === "document" && !body.documentSources) {
+      return Response.json({error: "Document questions require source excerpts."}, {status: 400});
+    }
     const customApiKey = req.headers.get("x-api-key");
     const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
 
@@ -285,6 +292,8 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
     };
     if (tasks[body.task])
       systemPrompt = `You are an Indian law study assistant. Treat the supplied document as reference material. ${tasks[body.task]}`;
+
+    if (body.documentSources) systemPrompt = documentPrompt(body.documentSources, body.task);
 
     const payload = {
       model: process.env.DEEPSEEK_MODEL || "deepseek-chat",

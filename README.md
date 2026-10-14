@@ -67,3 +67,43 @@ or API credentials; keep copies of the original PDFs.
 The library is a curated collection, not a complete or continuously updated legal
 database. Use the displayed dates and verify legal text and citations against
 official sources. Case detail pages contain study summaries, not full judgments.
+
+## PDF workspace
+
+The reader uses PDF.js's viewer, text/search, annotation, link, and rendering
+components, with local worker, CMaps, standard fonts, image codecs, and colour
+profiles. Rendering is bounded; thumbnails load near the visible sidebar area.
+JavaScript embedded in PDFs is not executed. Files up to 150 MB can be opened.
+
+Reader features include password prompts, precise search with next/previous
+matches, outlines and internal links, thumbnails, rotation, zoom, a hand tool,
+bookmarks, highlights, notes, and standard PDF form fields. Reading page, zoom,
+rotation, form values, annotations, and document conversations are stored in
+IndexedDB (including revision cards) under a SHA-256 content identifier. Different files with identical names
+have separate study work. Legacy highlights and revision cards are migrated without deleting the
+original copy. Storage failures are shown; the reader remains usable.
+
+Use the reader's Export menu for a document-specific JSON backup or Markdown
+notes. JSON backups can be imported into the same original PDF. This is separate
+from the assistant's general workspace backup. The original PDF must be kept or
+saved to the local library. Browser storage is not cloud sync and may be cleared.
+The annotated-PDF export adds standard highlight annotations and preserves form
+entries. It may be unavailable for encrypted documents. Exporting a modified PDF
+does not preserve a digital signature's validity. The print action opens a PDF
+in the browser's print-capable viewer; export an annotated copy to print notes.
+
+Document AI can use selected text, the current page, or up to five relevant
+excerpts retrieved from document text. It sends these excerpts and recent
+conversation messages to the configured provider, not the PDF binary. Excerpts
+are capped at 6,000 characters each and 22,000 characters total. Answers expose
+the actual source excerpts and link citations to physical PDF page numbers.
+Document retrieval is keyword based, not exhaustive legal research. Image-only
+pages need OCR in another tool before search or AI text analysis. This reader
+does not provide OCR, signature verification, redaction, or PDF content editing.
+
+`tests/pdf-reader.spec.js` covers encrypted/corrupt/image-only/rotated/120-page
+PDFs, native search and links, persistence, exports, AI source/retry behavior,
+mobile panels, and storage failure. Compact fixtures are checked in; regenerate
+with `python tests/fixtures/generate.py` after installing `reportlab` and `pypdf`.
+AI tests use mocked responses; production credentials and provider output must
+be checked separately.

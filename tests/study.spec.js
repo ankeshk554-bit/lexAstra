@@ -1,30 +1,4 @@
 import { test, expect } from "@playwright/test";
-function pdf() {
-  const content =
-    "BT /F1 18 Tf 50 750 Td (Contract law: offer and acceptance.) Tj ET";
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
-  ];
-  let text = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((o, i) => {
-    offsets.push(Buffer.byteLength(text));
-    text += `${i + 1} 0 obj\n${o}\nendobj\n`;
-  });
-  const start = Buffer.byteLength(text);
-  text +=
-    `xref\n0 6\n0000000000 65535 f \n` +
-    offsets
-      .slice(1)
-      .map((n) => String(n).padStart(10, "0") + " 00000 n \n")
-      .join("") +
-    `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
-  return Buffer.from(text);
-}
 test("unified search opens a readable case detail and library filters work", async ({
   page,
 }) => {
@@ -86,59 +60,18 @@ test("chat flushes the final answer and regeneration does not duplicate the ques
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1].messages.filter((m) => m.role === "user")).toHaveLength(1);
   expect(requests[1].examMode).toBe("Judiciary");
+  await expect(
+    page.getByRole("button", { name: "Regenerate", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".chat-message-wrapper--ai")).toContainText(
+    "final token.",
+  );
   await page.reload();
   await expect(page.locator(".chat-message-wrapper--ai")).toContainText(
     "final token.",
   );
 });
-test("PDF saves, renders selectable text, searches, and reopens from the library", async ({
-  page,
-}) => {
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/pdf-reader");
-  await expect(
-    page.getByText("Import Textbook / Bare Act", { exact: true }),
-  ).toBeVisible();
-  await page.locator('input[type=file][accept=".pdf"]').first().setInputFiles({
-    name: "contract.pdf",
-    mimeType: "application/pdf",
-    buffer: pdf(),
-  });
-  await page.getByRole("button", { name: "Save to Permanent Library" }).click();
-  await expect(page.locator(".textLayer")).toContainText(
-    "offer and acceptance",
-  );
-  await expect(page.locator("canvas").first()).toBeVisible();
-  await page
-    .locator(".textLayer span")
-    .first()
-    .evaluate((el) => {
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-      el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-    });
-  await page
-    .locator(".pdf-floating-menu")
-    .getByTitle("Yellow", { exact: true })
-    .click();
-  await expect(page.locator(".highlight-rect").first()).toBeVisible();
-  await page.getByPlaceholder("Search in PDF...").fill("acceptance");
-  await expect(page.locator(".pdf-search-count")).toContainText("1");
-  await page.reload();
-  await page.locator(".book-card").filter({ hasText: "contract.pdf" }).click();
-  await expect(page.locator(".textLayer")).toContainText(
-    "offer and acceptance",
-  );
-  await expect(page.locator(".highlight-rect").first()).toBeVisible();
-  expect(errors).toEqual([]);
-});
-test("mobile navigation and PDF workspace remain reachable", async ({
-  page,
-}) => {
+test("mobile navigation reaches the PDF library", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation" }).click();
@@ -147,14 +80,8 @@ test("mobile navigation and PDF workspace remain reachable", async ({
     .getByRole("link", { name: "PDF workspace" })
     .click();
   await expect(
-    page.getByText("Import Textbook / Bare Act", { exact: true }),
+    page.getByRole("button", { name: "Open a PDF", exact: false }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Quick Read Temporary Document" })
-    .scrollIntoViewIfNeeded();
-  await expect(
-    page.getByRole("button", { name: "Quick Read Temporary Document" }),
-  ).toBeInViewport();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
