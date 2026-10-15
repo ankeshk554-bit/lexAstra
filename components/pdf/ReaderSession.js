@@ -35,6 +35,7 @@ import {
 } from "@/utils/pdf/exports";
 import PDFViewport from "./PDFViewport";
 import ReaderAI from "./ReaderAI";
+import SelectionActions, { HIGHLIGHT_COLORS } from "./SelectionActions";
 
 function Tool({ label, children, ...props }) {
   return (
@@ -140,7 +141,9 @@ const ReaderSession = forwardRef(function ReaderSession(
     [outline, setOutline] = useState(null),
     [selection, setSelection] = useState(null),
     [hand, setHand] = useState(false),
-    [selectionNote, setSelectionNote] = useState("");
+    [highlightMode, setHighlightMode] = useState(false),
+    [highlightColor, setHighlightColor] = useState("#fde047"),
+    [recentHighlights, setRecentHighlights] = useState([]);
   const [findOpen, setFindOpen] = useState(false),
     [query, setQuery] = useState(""),
     [caseSensitive, setCaseSensitive] = useState(false),
@@ -149,6 +152,8 @@ const ReaderSession = forwardRef(function ReaderSession(
     [busy, setBusy] = useState(false),
     [undo, setUndo] = useState(null);
   const viewer = useRef(null),
+    ai = useRef(null),
+    selectionTools = useRef(null),
     findInput = useRef(null),
     backupInput = useRef(null),
     snapshot = useRef(study),
@@ -223,6 +228,14 @@ const ReaderSession = forwardRef(function ReaderSession(
     };
   }, [document, flush]);
   useEffect(() => {
+    selectionTools.current = {
+      selection,
+      highlightMode,
+      highlightColor,
+      addHighlight,
+    };
+  });
+  useEffect(() => {
     const key = (e) => {
       if (e.target.closest('[role="dialog"]')) return;
       const typing =
@@ -237,11 +250,29 @@ const ReaderSession = forwardRef(function ReaderSession(
         onOpen();
       } else if (e.key === "Escape") {
         setSelection(null);
+        setHighlightMode(false);
+        setHand(false);
+        window.getSelection()?.removeAllRanges();
         setFindOpen(false);
         viewer.current?.search("");
         setSidebar("");
         setAiOpen(false);
-      } else if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      } else if (
+        !typing &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !e.shiftKey
+      ) {
+        if (e.key.toLowerCase() === "h") {
+          e.preventDefault();
+          const state = selectionTools.current;
+          if (state.selection) state.addHighlight(state.highlightColor);
+          else {
+            setHighlightMode(!state.highlightMode);
+            setHand(false);
+          }
+        }
         if (e.key === "ArrowRight") {
           e.preventDefault();
           viewer.current?.goTo(
@@ -283,22 +314,48 @@ const ReaderSession = forwardRef(function ReaderSession(
     viewer.current?.goTo(clampPage(page, document.pdf.numPages));
     if (window.innerWidth < 900) setSidebar("");
   }
-  function addHighlight(color) {
-    if (!selection) return;
-    const notes = selection.groups.map((group) => ({
+  function addHighlight(color, note = "", selected = selection) {
+    if (!selected) return;
+    const notes = selected.groups.map((group) => ({
       id: crypto.randomUUID(),
       page: group.page,
       rects: group.rects,
       color,
-      text: selection.text,
-      note: selectionNote,
+      text: group.text || selected.text,
+      note,
       createdAt: Date.now(),
     }));
     update((s) => ({ ...s, annotations: [...s.annotations, ...notes] }));
+    setHighlightColor(color);
+    setRecentHighlights(notes.map((n) => n.id));
     setSelection(null);
-    setSelectionNote("");
     window.getSelection()?.removeAllRanges();
-    setNotice("Highlight saved to your notes.");
+    setNotice(
+      highlightMode
+        ? "Highlighted. Select another passage to keep highlighting."
+        : "Highlight saved to your notes.",
+    );
+  }
+  function selectPassage(value, { complete = false } = {}) {
+    if (value && complete && highlightMode) {
+      addHighlight(highlightColor, "", value);
+      return;
+    }
+    setSelection((previous) =>
+      previous?.signature === value?.signature ? previous : value,
+    );
+  }
+  function askSelection(prompt) {
+    if (!selection) return;
+    setAiOpen(true);
+    if (window.innerWidth < 1100) setSidebar("");
+    if (ai.current?.askSelection(prompt, selection)) {
+      setSelection(null);
+      window.getSelection()?.removeAllRanges();
+    } else
+      setNotice(
+        "AI is finishing an answer. Stop it or wait, then send your selected-text question.",
+      );
   }
   function captureForms() {
     setTimeout(() => {
@@ -551,11 +608,39 @@ const ReaderSession = forwardRef(function ReaderSession(
           aria-pressed={hand}
           onClick={() => {
             setHand(!hand);
+            setHighlightMode(false);
             setSelection(null);
           }}
         >
           <Hand size={17} />
         </Tool>
+        <button
+          className="reader-highlighter-tool"
+          title="Highlight as you select (H)"
+          aria-label="Highlight as you select (H)"
+          aria-pressed={highlightMode}
+          onClick={() => {
+            setHighlightMode(!highlightMode);
+            setHand(false);
+            if (!highlightMode && selection) addHighlight(highlightColor);
+          }}
+        >
+          <Highlighter size={17} />
+          <span>Highlight</span>
+        </button>
+        {highlightMode && (
+          <select
+            aria-label="Highlighter color"
+            value={highlightColor}
+            onChange={(e) => setHighlightColor(e.target.value)}
+          >
+            {HIGHLIGHT_COLORS.map(([name, color]) => (
+              <option key={color} value={color}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
         <Tool
           label={bookmark ? "Remove bookmark" : "Bookmark this page"}
           aria-pressed={bookmark}
@@ -713,6 +798,22 @@ const ReaderSession = forwardRef(function ReaderSession(
       {notice && (
         <div className="reader-notice" role="status">
           <span>{notice}</span>
+          {recentHighlights.length > 0 && notice.startsWith("Highlight") && (
+            <button
+              onClick={() => {
+                update((s) => ({
+                  ...s,
+                  annotations: s.annotations.filter(
+                    (a) => !recentHighlights.includes(a.id),
+                  ),
+                }));
+                setRecentHighlights([]);
+                setNotice("");
+              }}
+            >
+              Undo highlight
+            </button>
+          )}
           <button
             aria-label="Dismiss notification"
             onClick={() => setNotice("")}
@@ -929,63 +1030,33 @@ const ReaderSession = forwardRef(function ReaderSession(
             initialView={document.study}
             annotations={study.annotations}
             hand={hand}
+            highlightMode={highlightMode}
             onChange={changeView}
-            onSelection={(value) => {
-              setSelection(value);
-              setSelectionNote("");
-            }}
+            onSelection={selectPassage}
             onError={setError}
           />
-          {selection && (
-            <div
-              className="reader-selection"
-              role="region"
-              aria-label="Selected text actions"
-            >
-              <div>
-                <Highlighter size={17} />
-                <strong>{selection.text.length} characters selected</strong>
-                <Tool
-                  label="Dismiss selection"
-                  onClick={() => setSelection(null)}
-                >
-                  <X size={16} />
-                </Tool>
-              </div>
-              <input
-                aria-label="Note for selection"
-                placeholder="Add a note (optional)…"
-                value={selectionNote}
-                onChange={(e) => setSelectionNote(e.target.value)}
-              />
-              <div>
-                {[
-                  ["Yellow", "#fde047"],
-                  ["Green", "#86efac"],
-                  ["Blue", "#93c5fd"],
-                  ["Pink", "#f9a8d4"],
-                ].map(([name, color]) => (
-                  <button
-                    key={color}
-                    className="reader-swatch"
-                    style={{ background: color }}
-                    aria-label={`Highlight ${name.toLowerCase()}`}
-                    title={name}
-                    onClick={() => addHighlight(color)}
-                  />
-                ))}
-                <button
-                  className="reader-primary"
-                  onClick={() => {
-                    setAiOpen(true);
-                    if (window.innerWidth < 1100) setSidebar("");
-                  }}
-                >
-                  <Sparkles size={16} />
-                  Ask about selection
-                </button>
-              </div>
+          {highlightMode && !selection && (
+            <div className="reader-tool-hint">
+              <span className="reader-mouse-hint">
+                Drag across text to highlight · H or Esc to exit
+              </span>
+              <span className="reader-touch-hint">
+                Select text, adjust the handles, then tap Highlight
+              </span>
             </div>
+          )}
+          {selection && (
+            <SelectionActions
+              key={selection.signature}
+              selection={selection}
+              color={highlightColor}
+              onHighlight={addHighlight}
+              onAsk={askSelection}
+              onDismiss={() => {
+                setSelection(null);
+                window.getSelection()?.removeAllRanges();
+              }}
+            />
           )}
         </section>
         <div
@@ -994,6 +1065,8 @@ const ReaderSession = forwardRef(function ReaderSession(
           inert={!aiOpen}
         >
           <ReaderAI
+            ref={ai}
+            onClearSelection={() => setSelection(null)}
             document={document}
             page={view.page}
             selection={selection}

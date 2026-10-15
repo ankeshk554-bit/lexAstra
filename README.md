@@ -83,6 +83,15 @@ IndexedDB (including revision cards) under a SHA-256 content identifier. Differe
 have separate study work. Legacy highlights and revision cards are migrated without deleting the
 original copy. Storage failures are shown; the reader remains usable.
 
+Select text to reveal actions beside the passage: Highlight, a choice of colours,
+one-click Explain, and a field for asking a custom question. The optional note
+field is under Add a note. For repeated highlights, enable Highlight in the
+toolbar (or press H), then drag and release on each passage. H also highlights
+an existing selection; Escape exits the tool. The latest highlight can be undone.
+On touch screens, adjust native selection handles, then tap Highlight.
+Selected-text questions automatically attach the passage and its pages; the
+attachment remains available for follow-ups until removed or replaced.
+
 Use the reader's Export menu for a document-specific JSON backup or Markdown
 notes. JSON backups can be imported into the same original PDF. This is separate
 from the assistant's general workspace backup. The original PDF must be kept or
@@ -97,6 +106,12 @@ excerpts retrieved from document text. It sends these excerpts and recent
 conversation messages to the configured provider, not the PDF binary. Excerpts
 are capped at 6,000 characters each and 22,000 characters total. Answers expose
 the actual source excerpts and link citations to physical PDF page numbers.
+The default PDF + knowledge mode allows broader legal explanations, with outside
+knowledge labelled separately from PDF-supported claims. PDF only restricts
+answers to the supplied excerpts. No PDF context can be selected for general
+questions, including when reading a scanned document. Summaries and revision
+cards always require PDF text. These modes do not provide live web search or
+verification of current law.
 Document retrieval is keyword based, not exhaustive legal research. Image-only
 pages need OCR in another tool before search or AI text analysis. This reader
 does not provide OCR, signature verification, redaction, or PDF content editing.

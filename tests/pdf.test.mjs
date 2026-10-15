@@ -97,6 +97,27 @@ test("invalid and oversized local files are rejected before parsing", () => {
   assert.doesNotThrow(() => validatePDFFile({ name: "book.PDF", size: 10 }));
 });
 
+test("broader AI answers distinguish outside knowledge while source tasks stay grounded", () => {
+  const sources = [{ page: 2, text: "Acceptance requires assent." }];
+  const extended = documentPrompt(sources, "document", "extended");
+  assert.match(extended, /broader legal knowledge/);
+  assert.match(extended, /General legal context/);
+  assert.match(extended, /never attribute it to the PDF/);
+  assert.match(extended, /no live web search/);
+  assert.match(extended, /Never use a PDF page citation for general knowledge/);
+  assert.doesNotMatch(extended, /Use ONLY facts/);
+  assert.match(
+    documentPrompt([], "document", "extended"),
+    /none; do not generate page citations/,
+  );
+  assert.match(
+    documentPrompt(sources, "document", "document"),
+    /Use ONLY facts/,
+  );
+  for (const task of ["summary", "flashcards", "note"])
+    assert.match(documentPrompt(sources, task, "extended"), /Use ONLY facts/);
+});
+
 test("revision cards require valid content and supplied page sources", async () => {
   const { parseFlashcards } = await import("../utils/pdf/document.mjs");
   const card = {

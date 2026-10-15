@@ -38,6 +38,253 @@ async function go(page, number) {
     `Page ${number} of`,
   );
 }
+async function dragText(page, text = "An offer") {
+  const span = page
+    .locator('.page[data-page-number="1"] .textLayer span')
+    .filter({ hasText: text })
+    .first();
+  await expect(span).toBeVisible();
+  const box = await span.boundingBox();
+  await page.mouse.move(box.x + 1, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2, {
+    steps: 12,
+  });
+  return page.evaluate(() => window.getSelection().toString().trim());
+}
+async function mockAnswers(page, requests) {
+  await page.route("**/api/chat", (route) => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({
+      contentType: "text/event-stream",
+      body:
+        "data: " +
+        JSON.stringify({
+          choices: [{ delta: { content: "A helpful explanation." } }],
+        }),
+    });
+  });
+}
+
+test("highlighter waits for drag release, keeps its colour and supports undo and keyboard exit", async ({
+  page,
+}) => {
+  await open(page);
+  const tool = page.getByRole("button", {
+    name: "Highlight as you select (H)",
+    exact: true,
+  });
+  await tool.click();
+  await page
+    .getByRole("combobox", { name: "Highlighter color" })
+    .selectOption("#86efac");
+  const selected = await dragText(page);
+  expect(selected).toContain("offer");
+  // Holding a drag must never save a partial highlight from selectionchange.
+  await page.waitForTimeout(350);
+  await expect(page.locator(".reader-highlight")).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.locator(".reader-highlight")).toHaveCount(1);
+  await expect(page.locator(".reader-highlight")).toHaveCSS(
+    "background-color",
+    "rgb(134, 239, 172)",
+  );
+  await expect(tool).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Undo highlight" }).click();
+  await expect(page.locator(".reader-highlight")).toHaveCount(0);
+  await dragText(page);
+  await page.mouse.up();
+  await expect(page.locator(".reader-highlight")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(tool).toHaveAttribute("aria-pressed", "false");
+  await dragText(page, "Chapter 1");
+  await page.mouse.up();
+  await expect(
+    page.getByRole("region", { name: "Selected text actions" }),
+  ).toBeVisible();
+  await page.keyboard.press("h");
+  await expect(page.locator(".reader-highlight")).toHaveCount(2);
+  await expect(
+    page.getByRole("region", { name: "Selected text actions" }),
+  ).toHaveCount(0);
+});
+
+test("a question beside real selected text sends its passage and retains it for follow-ups", async ({
+  page,
+}) => {
+  const requests = [];
+  await mockAnswers(page, requests);
+  await open(page);
+  const text = await dragText(page);
+  await page.mouse.up();
+  const popup = page.getByRole("region", { name: "Selected text actions" });
+  await expect(popup).toBeInViewport();
+  const box = await popup.boundingBox();
+  const line = await page
+    .locator('.page[data-page-number="1"] .textLayer span')
+    .filter({ hasText: "An offer" })
+    .first()
+    .boundingBox();
+  expect(Math.abs(box.y - line.y)).toBeLessThan(100);
+  await page
+    .getByRole("textbox", { name: "Ask about selected text", exact: true })
+    .fill("How would this apply to an online offer?");
+  await page
+    .getByRole("button", { name: "Send selected text question" })
+    .click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  expect(requests).toHaveLength(1);
+  expect(requests[0].documentSources).toEqual([{ page: 1, text }]);
+  expect(requests[0].answerMode).toBe("extended");
+  expect(requests[0].messages.at(-1).content).toBe(
+    "How would this apply to an online offer?",
+  );
+  await expect(popup).toHaveCount(0);
+  await expect(page.locator(".reader-ai-attachment")).toContainText(text);
+  await go(page, 4);
+  await page
+    .getByRole("textbox", { name: "Ask about this PDF" })
+    .fill("Give a contrasting example");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect(page.locator(".reader-message--assistant")).toHaveCount(2);
+  expect(requests[1].documentSources).toEqual(requests[0].documentSources);
+  await page
+    .getByRole("button", { name: "Remove selected text from question" })
+    .click();
+  await expect(page.getByRole("combobox", { name: "AI source" })).toHaveValue(
+    "page",
+  );
+});
+
+test("mobile selection can be adjusted before highlighting and Explain sends it in one tap", async ({
+  page,
+}) => {
+  const requests = [];
+  await mockAnswers(page, requests);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await page
+    .getByRole("button", { name: "Highlight as you select (H)", exact: true })
+    .click();
+  await page.locator(".reader-viewport").evaluate((el) => {
+    el.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, pointerType: "touch" }),
+    );
+  });
+  await select(page);
+  await expect(page.locator(".reader-highlight")).toHaveCount(0);
+  const popup = page.getByRole("region", { name: "Selected text actions" });
+  await expect(popup).toBeInViewport();
+  await popup.getByRole("button", { name: "Highlight", exact: true }).click();
+  await expect(page.locator(".reader-highlight").first()).toBeVisible();
+  await page
+    .getByRole("button", { name: "Highlight as you select (H)", exact: true })
+    .click();
+  await select(page);
+  await popup.getByRole("button", { name: "Explain", exact: true }).click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  expect(requests).toHaveLength(1);
+  expect(requests[0].documentSources[0].text).toContain("An offer");
+  expect(requests[0].messages.at(-1).content).toContain(
+    "Explain this selected passage",
+  );
+  await expect(
+    page.getByRole("textbox", { name: "Ask about this PDF" }),
+  ).toBeInViewport();
+  await expect(page.locator(".reader-ai-attachment")).toBeInViewport();
+  await page.setViewportSize({ width: 390, height: 500 });
+  await expect(
+    page.getByRole("textbox", { name: "Ask about this PDF" }),
+  ).toBeInViewport();
+  await expect(
+    page.getByRole("button", { name: "Close AI panel" }),
+  ).toBeInViewport();
+});
+
+test("AI can answer beyond scanned pages but PDF-only questions and summaries require text", async ({
+  page,
+}) => {
+  const requests = [];
+  await mockAnswers(page, requests);
+  await open(page, "scanned.pdf");
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Ask about this PDF" })
+    .fill("What is promissory estoppel?");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  expect(requests[0].documentSources).toEqual([]);
+  expect(requests[0].answerMode).toBe("extended");
+  await expect(page.locator(".reader-answer-label")).toHaveText(
+    "General knowledge · no PDF text used",
+  );
+  await page.getByRole("combobox", { name: "AI source" }).selectOption("none");
+  await page.getByRole("button", { name: "PDF only", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "AI source" })).toHaveValue(
+    "page",
+  );
+  await page
+    .getByRole("textbox", { name: "Ask about this PDF" })
+    .fill("Quote the rule on this page");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect(page.locator(".reader-ai-error")).toContainText("OCR is needed");
+  expect(requests).toHaveLength(1);
+  await expect(
+    page.getByRole("button", { name: "Retry last request" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "PDF + knowledge", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Summarize", exact: true }).click();
+  await expect(page.locator(".reader-ai-error")).toContainText("OCR is needed");
+  expect(requests).toHaveLength(1);
+});
+
+test("search-marked selections send the text once and PDF-only requests preserve their mode", async ({
+  page,
+}) => {
+  const requests = [];
+  await mockAnswers(page, requests);
+  await open(page);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await page.getByRole("button", { name: "PDF only", exact: true }).click();
+  await page.getByRole("button", { name: "Close AI panel" }).click();
+  await page.getByRole("button", { name: "Find in document (Ctrl+F)" }).click();
+  await page
+    .getByRole("searchbox", { name: "Search document" })
+    .fill("acceptance");
+  await expect(page.locator(".reader-find [role=status]")).toHaveText(
+    "1 of 16",
+  );
+  await select(page);
+  const text = await page.evaluate(() =>
+    window.getSelection().toString().trim(),
+  );
+  await page
+    .getByRole("region", { name: "Selected text actions" })
+    .getByRole("button", { name: "Explain", exact: true })
+    .click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  expect(requests[0].documentSources).toEqual([{ page: 1, text }]);
+  expect(requests[0].answerMode).toBe("document");
+  await expect(page.locator(".reader-answer-label")).toHaveText("PDF only");
+  await page.getByRole("button", { name: "Close AI panel" }).click();
+  await select(page);
+  await page.getByRole("button", { name: "Highlight blue" }).click();
+  const rectangles = await page
+    .locator(".reader-highlight")
+    .evaluateAll((els) => els.map((el) => el.style.cssText));
+  expect(rectangles.length).toBeGreaterThan(0);
+  expect(new Set(rectangles).size).toBe(rectangles.length);
+});
 
 test("native navigation, individual search matches, rotation and internal links work", async ({
   page,
@@ -93,6 +340,7 @@ test("notes, form entries, bookmarks and position survive reload; annotated expo
   ).toBeVisible();
   await page.locator('.annotationLayer input[name="student"]').fill("Asha");
   await select(page);
+  await page.locator(".reader-selection-note summary").click();
   await page
     .getByRole("textbox", { name: "Note for selection" })
     .fill("Offer + assent");
@@ -237,11 +485,13 @@ test("AI uses explicit sources, supports retry without duplicate questions and p
   await expect(page.locator(".reader-ai-error")).toContainText(
     "temporarily unavailable",
   );
+  await page.getByRole("button", { name: "PDF only", exact: true }).click();
   await page.getByRole("button", { name: "Retry last request" }).click();
   await expect(page.locator(".reader-message--assistant")).toContainText(
     "Acceptance forms agreement",
   );
   expect(requests).toHaveLength(2);
+  expect(requests[1].answerMode).toBe("extended");
   expect(requests[1].messages.filter((m) => m.role === "user")).toHaveLength(1);
   expect(requests[1].documentSources).toHaveLength(1);
   expect(requests[1].documentSources[0].page).toBe(2);
@@ -368,6 +618,22 @@ test("source payloads and PDF asset paths are validated on the server", async ({
   request,
 }) => {
   const messages = [{ role: "user", content: "Explain this" }];
+  for (const body of [
+    { answerMode: "invalid", documentSources: [] },
+    { answerMode: "document", task: "document", documentSources: [] },
+    { answerMode: "extended", task: "summary", documentSources: [] },
+    { answerMode: "extended", task: "flashcards" },
+    {
+      answerMode: "extended",
+      documentSources: [{ page: 0, text: "Bad page" }],
+    },
+  ]) {
+    expect(
+      (
+        await request.post("/api/chat", { data: { messages, ...body } })
+      ).status(),
+    ).toBe(400);
+  }
   expect(
     (
       await request.post("/api/chat", { data: { messages, task: "document" } })

@@ -8,6 +8,7 @@ const PDFViewport = forwardRef(function PDFViewport(
     initialView,
     annotations,
     hand,
+    highlightMode,
     onChange,
     onSelection,
     onError,
@@ -16,7 +17,9 @@ const PDFViewport = forwardRef(function PDFViewport(
 ) {
   const containerRef = useRef(null),
     viewerRef = useRef(null),
-    instanceRef = useRef(null);
+    instanceRef = useRef(null),
+    selecting = useRef(false),
+    pointerType = useRef("mouse");
   const latest = useRef({ annotations, hand, onChange, onSelection, onError });
   useEffect(() => {
     latest.current = { annotations, hand, onChange, onSelection, onError };
@@ -159,7 +162,7 @@ const PDFViewport = forwardRef(function PDFViewport(
           if (
             !/INPUT|TEXTAREA/.test(window.document.activeElement?.tagName || "")
           )
-            selectText();
+            if (!selecting.current) selectText();
         }, 160);
       },
       { signal: abort.signal },
@@ -234,7 +237,7 @@ const PDFViewport = forwardRef(function PDFViewport(
     }),
     [],
   );
-  function selectText() {
+  function selectText(complete = false) {
     if (latest.current.hand) return;
     const selection = window.getSelection();
     if (!selection?.rangeCount || !selection.toString().trim()) return;
@@ -252,9 +255,17 @@ const PDFViewport = forwardRef(function PDFViewport(
       if (!pv?.viewport) return;
       const bounds = page.getBoundingClientRect(),
         rects = [],
+        seenRects = new Set(),
         texts = [];
       page.querySelectorAll(".textLayer span").forEach((span) => {
-        if (!range.intersectsNode(span) || !span.firstChild) return;
+        // Search highlights and marked-content wrappers contain the same text nodes.
+        if (
+          span.classList.contains("markedContent") ||
+          span.classList.contains("highlight") ||
+          !range.intersectsNode(span) ||
+          !span.firstChild
+        )
+          return;
         const part = window.document.createRange();
         part.selectNodeContents(span);
         if (span.contains(range.startContainer))
@@ -264,6 +275,10 @@ const PDFViewport = forwardRef(function PDFViewport(
         texts.push(part.toString());
         for (const rect of part.getClientRects()) {
           if (rect.width < 1 || rect.height < 1) continue;
+          // Nested search spans can report the same rectangle for element and text.
+          const key = [rect.left, rect.top, rect.right, rect.bottom].join(",");
+          if (seenRects.has(key)) continue;
+          seenRects.add(key);
           const a = pv.viewport.convertToPdfPoint(
             rect.left - bounds.left - page.clientLeft,
             rect.top - bounds.top - page.clientTop,
@@ -288,21 +303,39 @@ const PDFViewport = forwardRef(function PDFViewport(
         });
     });
     if (groups.length)
-      latest.current.onSelection({
-        text: selection.toString().trim().slice(0, 20000),
-        groups,
-      });
+      latest.current.onSelection(
+        {
+          range: range.cloneRange(),
+          anchor: range.getBoundingClientRect(),
+          signature: JSON.stringify(groups.map((g) => [g.page, g.rects])),
+          text: selection.toString().trim().slice(0, 20000),
+          groups,
+        },
+        { complete },
+      );
   }
   const pan = useRef(null);
   return (
     <div
-      className={"reader-viewport" + (hand ? " reader-viewport--hand" : "")}
+      className={
+        "reader-viewport" +
+        (hand ? " reader-viewport--hand" : "") +
+        (highlightMode ? " reader-viewport--highlight" : "")
+      }
       ref={containerRef}
       tabIndex={0}
       aria-label="PDF pages"
-      onMouseUp={selectText}
-      onKeyUp={selectText}
+      onMouseUp={(e) => {
+        selecting.current = false;
+        selectText(
+          pointerType.current === "mouse" &&
+            !e.nativeEvent.sourceCapabilities?.firesTouchEvents,
+        );
+      }}
+      onKeyUp={() => selectText()}
       onPointerDown={(e) => {
+        pointerType.current = e.pointerType;
+        selecting.current = e.pointerType === "mouse" && e.button === 0;
         if (hand && e.button === 0) {
           pan.current = {
             x: e.clientX,
@@ -322,9 +355,11 @@ const PDFViewport = forwardRef(function PDFViewport(
         }
       }}
       onPointerUp={() => {
+        selecting.current = false;
         pan.current = null;
       }}
       onPointerCancel={() => {
+        selecting.current = false;
         pan.current = null;
       }}
     >

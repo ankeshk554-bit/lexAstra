@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { ArrowUp, Settings2, Sparkles, Square, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,18 +45,24 @@ function Answer({ message, onGo }) {
     </ReactMarkdown>
   );
 }
-export default function ReaderAI({
-  document,
-  page,
-  selection,
-  messages,
-  onMessages,
-  onCards,
-  onSaveNote,
-  onGo,
-  onClose,
-}) {
+const ReaderAI = forwardRef(function ReaderAI(
+  {
+    document,
+    page,
+    selection,
+    messages,
+    onMessages,
+    onCards,
+    onSaveNote,
+    onGo,
+    onClose,
+    onClearSelection,
+  },
+  ref,
+) {
   const [scope, setScope] = useState("page"),
+    [answerMode, setAnswerMode] = useState("extended"),
+    [attachedSelection, setAttachedSelection] = useState(null),
     [question, setQuestion] = useState(""),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(""),
@@ -64,7 +76,8 @@ export default function ReaderAI({
     request = useRef(null),
     currentMessages = useRef(messages),
     latest = useRef({ onMessages, onCards }),
-    bottom = useRef(null);
+    bottom = useRef(null),
+    composer = useRef(null);
   useEffect(() => {
     currentMessages.current = messages;
     latest.current = { onMessages, onCards };
@@ -73,7 +86,10 @@ export default function ReaderAI({
   const [lastSelection, setLastSelection] = useState(selection);
   if (lastSelection !== selection) {
     setLastSelection(selection);
-    setScope(selection ? "selection" : "page");
+    if (selection) {
+      setAttachedSelection(selection);
+      setScope("selection");
+    }
   }
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "nearest" });
@@ -96,12 +112,16 @@ export default function ReaderAI({
     }
     return { page: number, text: cache.current.get(number) };
   }
-  async function sourcesFor(prompt, signal) {
-    if (scope === "selection" && selection)
+  async function sourcesFor(prompt, signal, selected, mode, task) {
+    const activeSelection = selected || attachedSelection;
+    const needsPDF =
+      mode === "document" || ["summary", "flashcards", "note"].includes(task);
+    if (scope === "none" && !selected) return [];
+    if ((selected || scope === "selection") && activeSelection)
       return contextForPages(
-        selection.groups.map((g) => ({
+        activeSelection.groups.map((g) => ({
           page: g.page,
-          text: g.text || selection.text,
+          text: g.text || activeSelection.text,
         })),
       );
     if (scope !== "document")
@@ -124,7 +144,7 @@ export default function ReaderAI({
         await new Promise((resolve) => setTimeout(resolve, 0));
     }
     const ranked = rankPassages(pages, prompt);
-    if (!ranked.length)
+    if (!ranked.length && needsPDF)
       throw new Error(
         pages.some((p) => p.text.trim())
           ? "No passages matched this question. Use words from the document, or select a passage directly."
@@ -132,18 +152,34 @@ export default function ReaderAI({
       );
     return contextForPages(ranked);
   }
-  async function ask(prompt, task = "document", previous = null) {
+  async function ask(
+    prompt,
+    task = "document",
+    previous = null,
+    selected = null,
+  ) {
     if (request.current || !prompt.trim()) return;
     const controller = new AbortController();
     request.current = controller;
     setBusy(true);
     setError("");
-    setProgress("Reading source text…");
+    setRetry(null);
+    setProgress("Preparing your question…");
+    const mode =
+      previous?.mode ||
+      (["summary", "flashcards", "note"].includes(task)
+        ? "document"
+        : answerMode);
     let assistantId, base;
     try {
       const sources =
-        previous?.sources || (await sourcesFor(prompt, controller.signal));
-      if (!sources.length)
+        previous?.sources ||
+        (await sourcesFor(prompt, controller.signal, selected, mode, task));
+      if (
+        !sources.length &&
+        (mode === "document" ||
+          ["summary", "flashcards", "note"].includes(task))
+      )
         throw new Error(
           "No selectable text was found on this page. This PDF may be scanned; OCR is needed before AI can read it.",
         );
@@ -153,14 +189,22 @@ export default function ReaderAI({
         { id: crypto.randomUUID(), role: "user", content: prompt },
       ];
       assistantId = crypto.randomUUID();
-      const prepared = { prompt, task, sources, base };
+      const prepared = { prompt, task, sources, base, mode };
       setRetry(prepared);
       commit([
         ...base,
-        { id: assistantId, role: "assistant", content: "", sources },
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          sources,
+          answerMode: mode,
+        },
       ]);
       setQuestion("");
-      setProgress("Writing from the selected sources…");
+      setProgress(
+        mode === "document" ? "Writing from the PDF…" : "Writing your answer…",
+      );
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -171,6 +215,7 @@ export default function ReaderAI({
           messages: base.map(({ role, content }) => ({ role, content })),
           fileName: document.name,
           documentSources: sources,
+          answerMode: mode,
           task: task === "document" ? "document" : task,
         }),
         signal: controller.signal,
@@ -185,7 +230,13 @@ export default function ReaderAI({
         if (controller.signal.aborted || task === "flashcards") return;
         commit([
           ...base,
-          { id: assistantId, role: "assistant", content: text, sources },
+          {
+            id: assistantId,
+            role: "assistant",
+            content: text,
+            sources,
+            answerMode: mode,
+          },
         ]);
       });
       controller.signal.throwIfAborted();
@@ -202,6 +253,7 @@ export default function ReaderAI({
             role: "assistant",
             content: `Created ${cards.length} revision cards. Open Cards in the document sidebar to practice.`,
             sources,
+            answerMode: "document",
           },
         ]);
       }
@@ -231,6 +283,16 @@ export default function ReaderAI({
       }
     }
   }
+  useImperativeHandle(ref, () => ({
+    askSelection(prompt, selected) {
+      if (request.current) return false;
+      setAttachedSelection(selected);
+      setScope("selection");
+      ask(prompt, "document", null, selected);
+      requestAnimationFrame(() => composer.current?.focus());
+      return true;
+    },
+  }));
   return (
     <aside className="reader-ai" aria-label="Document AI assistant">
       <div className="reader-panel-heading">
@@ -274,25 +336,58 @@ export default function ReaderAI({
         </div>
       )}
       <div className="reader-ai-scope">
+        <div
+          className="reader-answer-modes"
+          role="group"
+          aria-label="Answer sources"
+        >
+          <button
+            aria-pressed={answerMode === "extended"}
+            onClick={() => setAnswerMode("extended")}
+          >
+            PDF + knowledge
+          </button>
+          <button
+            aria-pressed={answerMode === "document"}
+            onClick={() => {
+              setAnswerMode("document");
+              if (scope === "none") setScope("page");
+            }}
+          >
+            PDF only
+          </button>
+        </div>
+        <p className="reader-answer-mode-help">
+          {answerMode === "extended"
+            ? "Ask beyond the page. Broader legal knowledge is labelled separately; it is not a live web search."
+            : "Answers stay within the supplied PDF excerpts, with page citations."}
+        </p>
         <label>
-          Source
+          PDF context
           <select
             aria-label="AI source"
             value={scope}
             onChange={(e) => setScope(e.target.value)}
           >
             <option value="page">Current page · {page}</option>
-            <option value="selection" disabled={!selection}>
+            <option value="selection" disabled={!attachedSelection}>
               Selected text
-              {selection ? ` · ${selection.groups.length} page(s)` : ""}
+              {attachedSelection
+                ? ` · ${attachedSelection.groups.length} page(s)`
+                : ""}
             </option>
             <option value="document">Find relevant pages in document</option>
+            {answerMode === "extended" && (
+              <option value="none">No PDF context</option>
+            )}
           </select>
         </label>
         <p>
           {scope === "document"
             ? "Searches the document for excerpts relevant to your question."
-            : "Only text from this source is sent with your question."}
+            : scope === "none"
+              ? "Your question and recent conversation are sent without PDF excerpts."
+              : "This text is sent with your question and recent conversation."}
         </p>
       </div>
       <div
@@ -326,6 +421,15 @@ export default function ReaderAI({
             className={`reader-message reader-message--${message.role}`}
           >
             <strong>{message.role === "user" ? "You" : "LexAstra"}</strong>
+            {message.role === "assistant" && (
+              <span className="reader-answer-label">
+                {message.answerMode === "extended"
+                  ? message.sources?.length
+                    ? "PDF + general knowledge"
+                    : "General knowledge · no PDF text used"
+                  : "PDF only"}
+              </span>
+            )}
             {message.content ? (
               <Answer message={message} onGo={onGo} />
             ) : (
@@ -363,6 +467,30 @@ export default function ReaderAI({
         <div ref={bottom} />
       </div>
       <div className="reader-ai-composer">
+        {scope === "selection" && attachedSelection && (
+          <div className="reader-ai-attachment">
+            <div>
+              <strong>
+                Selected text · Page{" "}
+                {attachedSelection.groups.map((g) => g.page).join(", ")}
+              </strong>
+              <button
+                aria-label="Remove selected text from question"
+                onClick={() => {
+                  setAttachedSelection(null);
+                  setScope("page");
+                  onClearSelection?.();
+                }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <blockquote>
+              {attachedSelection.text.slice(0, 220)}
+              {attachedSelection.text.length > 220 ? "…" : ""}
+            </blockquote>
+          </div>
+        )}
         {error && (
           <div className="reader-ai-error" role="alert">
             {error}
@@ -381,9 +509,11 @@ export default function ReaderAI({
               Stop
             </button>
           </div>
-        ) : scope === "document" ? (
+        ) : scope === "document" || scope === "none" ? (
           <p className="reader-ai-retrieval-hint">
-            Ask a specific question to find relevant passages.
+            {scope === "none"
+              ? "Ask a legal question, even if it is not covered in this PDF."
+              : "Ask a specific question to find relevant passages."}
           </p>
         ) : (
           <div className="reader-ai-quick">
@@ -426,8 +556,13 @@ export default function ReaderAI({
           }}
         >
           <textarea
+            ref={composer}
             aria-label="Ask about this PDF"
-            placeholder="Ask about this PDF…"
+            placeholder={
+              scope === "selection"
+                ? "Ask a follow-up about the selected text…"
+                : "Ask a question…"
+            }
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             maxLength={8000}
@@ -454,4 +589,5 @@ export default function ReaderAI({
       </div>
     </aside>
   );
-}
+});
+export default ReaderAI;

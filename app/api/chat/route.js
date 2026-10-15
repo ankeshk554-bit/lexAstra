@@ -1,5 +1,8 @@
 import { exams } from "@/data/exams";
-import {validateDocumentSources,documentPrompt} from "@/utils/pdf/aiContext.mjs";
+import {
+  validateDocumentSources,
+  documentPrompt,
+} from "@/utils/pdf/aiContext.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -108,12 +111,39 @@ export async function POST(req) {
         ? body.fileName.slice(0, 300)
         : "Document";
 
-    if (body.documentSources !== undefined && !validateDocumentSources(body.documentSources)) {
-      return Response.json({error: "Provide one to eight valid document excerpts within the context limit."}, {status: 400});
-    }
-    if (body.task === "document" && !body.documentSources) {
-      return Response.json({error: "Document questions require source excerpts."}, {status: 400});
-    }
+    const answerMode = body.answerMode ?? "document";
+    if (!["document", "extended"].includes(answerMode))
+      return Response.json(
+        { error: "Choose a valid answer mode." },
+        { status: 400 },
+      );
+    const sourceTask = ["summary", "note", "flashcards"].includes(body.task);
+    const withoutPDF =
+      answerMode === "extended" &&
+      !sourceTask &&
+      Array.isArray(body.documentSources) &&
+      body.documentSources.length === 0;
+    if (
+      body.documentSources !== undefined &&
+      !withoutPDF &&
+      !validateDocumentSources(body.documentSources)
+    )
+      return Response.json(
+        {
+          error:
+            "Provide one to eight valid document excerpts within the context limit.",
+        },
+        { status: 400 },
+      );
+    if (
+      ((body.task === "document" && answerMode === "document") ||
+        (body.answerMode !== undefined && sourceTask)) &&
+      !body.documentSources?.length
+    )
+      return Response.json(
+        { error: "This request requires PDF source excerpts." },
+        { status: 400 },
+      );
     const customApiKey = req.headers.get("x-api-key");
     const apiKey = customApiKey || process.env.DEEPSEEK_API_KEY;
 
@@ -293,7 +323,12 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
     if (tasks[body.task])
       systemPrompt = `You are an Indian law study assistant. Treat the supplied document as reference material. ${tasks[body.task]}`;
 
-    if (body.documentSources) systemPrompt = documentPrompt(body.documentSources, body.task);
+    if (body.documentSources || body.answerMode !== undefined)
+      systemPrompt = documentPrompt(
+        body.documentSources || [],
+        body.task,
+        answerMode,
+      );
 
     const payload = {
       model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
