@@ -16,6 +16,8 @@ import {
   FileUp,
   Hand,
   Highlighter,
+  Maximize,
+  Minimize,
   Minus,
   PanelLeft,
   Plus,
@@ -36,6 +38,8 @@ import {
 import PDFViewport from "./PDFViewport";
 import ReaderAI from "./ReaderAI";
 import SelectionActions, { HIGHLIGHT_COLORS } from "./SelectionActions";
+import StudyCards from "./StudyCards";
+import useReaderFullscreen from "./useReaderFullscreen";
 
 function Tool({ label, children, ...props }) {
   return (
@@ -144,6 +148,9 @@ const ReaderSession = forwardRef(function ReaderSession(
     [highlightMode, setHighlightMode] = useState(false),
     [highlightColor, setHighlightColor] = useState("#fde047"),
     [recentHighlights, setRecentHighlights] = useState([]);
+  const [aiWidth, setAiWidth] = useState(420),
+    [aiExpanded, setAiExpanded] = useState(false),
+    [cardDraft, setCardDraft] = useState(null);
   const [findOpen, setFindOpen] = useState(false),
     [query, setQuery] = useState(""),
     [caseSensitive, setCaseSensitive] = useState(false),
@@ -152,6 +159,10 @@ const ReaderSession = forwardRef(function ReaderSession(
     [busy, setBusy] = useState(false),
     [undo, setUndo] = useState(null);
   const viewer = useRef(null),
+    sessionRoot = useRef(null),
+    aiContainer = useRef(null),
+    resizing = useRef(null),
+    fullscreenAction = useRef(null),
     ai = useRef(null),
     selectionTools = useRef(null),
     findInput = useRef(null),
@@ -162,6 +173,10 @@ const ReaderSession = forwardRef(function ReaderSession(
     revision = useRef(0),
     written = useRef(0),
     alive = useRef(true);
+  const fullscreen = useReaderFullscreen(sessionRoot);
+  useEffect(() => {
+    fullscreenAction.current = fullscreen.toggle;
+  }, [fullscreen.toggle]);
   const flush = useCallback(() => {
     clearTimeout(timer.current);
     if (written.current === revision.current) return queue.current;
@@ -273,6 +288,10 @@ const ReaderSession = forwardRef(function ReaderSession(
             setHand(false);
           }
         }
+        if (e.key.toLowerCase() === "f") {
+          e.preventDefault();
+          fullscreenAction.current?.();
+        }
         if (e.key === "ArrowRight") {
           e.preventDefault();
           viewer.current?.goTo(
@@ -356,6 +375,28 @@ const ReaderSession = forwardRef(function ReaderSession(
       setNotice(
         "AI is finishing an answer. Stop it or wait, then send your selected-text question.",
       );
+  }
+  function makeCard() {
+    if (!selection) return;
+    setCardDraft({
+      question: "",
+      answer: selection.text.slice(0, 6000),
+      page: selection.groups[0].page,
+    });
+    setSidebar("cards");
+    setAiOpen(false);
+    setSelection(null);
+    window.getSelection()?.removeAllRanges();
+  }
+  function resizeAI(width) {
+    const parent = aiContainer.current?.parentElement;
+    const available =
+      (parent?.clientWidth || window.innerWidth) -
+      (parent?.querySelector(".reader-sidebar")?.clientWidth || 0);
+    setAiWidth(
+      Math.round(Math.max(320, Math.min(width, 760, available - 320))),
+    );
+    setAiExpanded(false);
   }
   function captureForms() {
     setTimeout(() => {
@@ -468,17 +509,26 @@ const ReaderSession = forwardRef(function ReaderSession(
   }
   function togglePanel(panel) {
     setSidebar(sidebar === panel ? "" : panel);
+    setAiExpanded(false);
+    setAiWidth((width) => Math.min(width, 420));
     if (window.innerWidth < 1100) setAiOpen(false);
   }
   const bookmark = study.bookmarks.includes(view.page);
   return (
     <div
       className="reader-session"
+      ref={sessionRoot}
       onInputCapture={captureForms}
       onChangeCapture={captureForms}
     >
       <header className="reader-document-bar">
-        <Tool label="Back to library" onClick={onClose}>
+        <Tool
+          label="Back to library"
+          onClick={async () => {
+            await fullscreen.exit();
+            onClose();
+          }}
+        >
           <ArrowLeft size={19} />
         </Tool>
         <div className="reader-document-name">
@@ -655,6 +705,18 @@ const ReaderSession = forwardRef(function ReaderSession(
           <Bookmark size={17} fill={bookmark ? "currentColor" : "none"} />
         </Tool>
         <span className="reader-toolbar-spacer" />
+        <Tool
+          label={
+            fullscreen.active ? "Exit fullscreen (F)" : "Fullscreen reading (F)"
+          }
+          aria-pressed={fullscreen.active}
+          onClick={fullscreen.toggle}
+        >
+          {fullscreen.active ? <Minimize size={17} /> : <Maximize size={17} />}
+          <span className="reader-fullscreen-label">
+            {fullscreen.active ? "Exit fullscreen" : "Fullscreen"}
+          </span>
+        </Tool>
         <details className="reader-export">
           <summary>
             <Download size={17} />
@@ -913,43 +975,15 @@ const ReaderSession = forwardRef(function ReaderSession(
                   </p>
                 ))}
               {sidebar === "cards" && (
-                <>
-                  {study.cards.length ? (
-                    study.cards.map((card) => (
-                      <article key={card.id} className="reader-card">
-                        <strong>{card.question}</strong>
-                        <details>
-                          <summary>Reveal answer</summary>
-                          <p>{card.answer}</p>
-                        </details>
-                        {card.page && (
-                          <button
-                            className="reader-page-link"
-                            onClick={() => goTo(card.page)}
-                          >
-                            Page {card.page}
-                          </button>
-                        )}
-                        <button
-                          className="reader-delete-note"
-                          onClick={() =>
-                            update((s) => ({
-                              ...s,
-                              cards: s.cards.filter((c) => c.id !== card.id),
-                            }))
-                          }
-                        >
-                          Remove card
-                        </button>
-                      </article>
-                    ))
-                  ) : (
-                    <p className="reader-muted">
-                      Choose a page or passage, then ask AI for revision cards.
-                      Your saved cards appear here.
-                    </p>
-                  )}
-                </>
+                <StudyCards
+                  cards={study.cards}
+                  onCards={(cards) => update({ cards })}
+                  onGo={goTo}
+                  page={view.page}
+                  draft={cardDraft}
+                  onDraft={setCardDraft}
+                  onDraftClose={() => setCardDraft(null)}
+                />
               )}
               {sidebar === "notes" && (
                 <>
@@ -1052,6 +1086,7 @@ const ReaderSession = forwardRef(function ReaderSession(
               color={highlightColor}
               onHighlight={addHighlight}
               onAsk={askSelection}
+              onCard={makeCard}
               onDismiss={() => {
                 setSelection(null);
                 window.getSelection()?.removeAllRanges();
@@ -1060,13 +1095,69 @@ const ReaderSession = forwardRef(function ReaderSession(
           )}
         </section>
         <div
-          className={"reader-ai-container" + (aiOpen ? " is-open" : "")}
+          ref={aiContainer}
+          className={
+            "reader-ai-container" +
+            (aiOpen ? " is-open" : "") +
+            (aiExpanded ? " is-expanded" : "")
+          }
+          style={{ "--ai-width": `${aiWidth}px` }}
           aria-hidden={!aiOpen}
           inert={!aiOpen}
         >
+          <div
+            className="reader-ai-resizer"
+            role="separator"
+            tabIndex={0}
+            aria-label="Resize AI panel"
+            aria-orientation="vertical"
+            aria-valuemin={320}
+            aria-valuemax={760}
+            aria-valuenow={aiExpanded ? 760 : aiWidth}
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              resizing.current = {
+                x: e.clientX,
+                width: aiContainer.current.getBoundingClientRect().width,
+              };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              if (resizing.current)
+                resizeAI(
+                  resizing.current.width + resizing.current.x - e.clientX,
+                );
+            }}
+            onPointerUp={() => {
+              resizing.current = null;
+            }}
+            onPointerCancel={() => {
+              resizing.current = null;
+            }}
+            onKeyDown={(e) => {
+              if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+                e.preventDefault();
+                e.stopPropagation();
+                const width = aiContainer.current.getBoundingClientRect().width;
+                resizeAI(
+                  e.key === "Home"
+                    ? 320
+                    : e.key === "End"
+                      ? 760
+                      : width + (e.key === "ArrowLeft" ? 40 : -40),
+                );
+              }
+            }}
+          />
           <ReaderAI
             ref={ai}
             onClearSelection={() => setSelection(null)}
+            expanded={aiExpanded}
+            onExpand={() => {
+              setAiExpanded(!aiExpanded);
+              setSidebar("");
+            }}
             document={document}
             page={view.page}
             selection={selection}

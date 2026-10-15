@@ -1,6 +1,6 @@
 "use client";
 import { useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, Highlighter, Sparkles, X } from "lucide-react";
+import { ArrowUp, BookOpenCheck, Highlighter, Sparkles, X } from "lucide-react";
 export const HIGHLIGHT_COLORS = [
   ["Yellow", "#fde047"],
   ["Green", "#86efac"],
@@ -13,6 +13,7 @@ export default function SelectionActions({
   color,
   onHighlight,
   onAsk,
+  onCard,
   onDismiss,
 }) {
   const root = useRef(null);
@@ -128,6 +129,10 @@ export default function SelectionActions({
           <ArrowUp size={17} />
         </button>
       </form>
+      <button className="reader-selection-card" onClick={onCard}>
+        <BookOpenCheck size={14} />
+        Make revision card
+      </button>
       <details className="reader-selection-note">
         <summary>Add a note</summary>
         <input

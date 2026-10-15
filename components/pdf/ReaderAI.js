@@ -2,11 +2,22 @@
 import {
   forwardRef,
   useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useRef,
   useState,
 } from "react";
-import { ArrowUp, Settings2, Sparkles, Square, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Maximize2,
+  Minimize2,
+  Settings2,
+  Sparkles,
+  Square,
+  X,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -57,6 +68,8 @@ const ReaderAI = forwardRef(function ReaderAI(
     onGo,
     onClose,
     onClearSelection,
+    expanded,
+    onExpand,
   },
   ref,
 ) {
@@ -68,6 +81,8 @@ const ReaderAI = forwardRef(function ReaderAI(
     [progress, setProgress] = useState(""),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false),
+    [optionsOpen, setOptionsOpen] = useState(false),
+    [showLatest, setShowLatest] = useState(false),
     [key, setKey] = useState(
       () => storage.getItem("lexastra_deepseek_api_key") || "",
     ),
@@ -76,7 +91,10 @@ const ReaderAI = forwardRef(function ReaderAI(
     request = useRef(null),
     currentMessages = useRef(messages),
     latest = useRef({ onMessages, onCards }),
-    bottom = useRef(null),
+    conversation = useRef(null),
+    followAnswer = useRef(true),
+    optionsRoot = useRef(null),
+    studyTools = useRef(null),
     composer = useRef(null);
   useEffect(() => {
     currentMessages.current = messages;
@@ -91,9 +109,31 @@ const ReaderAI = forwardRef(function ReaderAI(
       setScope("selection");
     }
   }
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "nearest" });
+  useLayoutEffect(() => {
+    const el = conversation.current;
+    if (followAnswer.current) el.scrollTop = el.scrollHeight;
   }, [messages, busy]);
+  useEffect(() => {
+    const el = conversation.current;
+    const resize = new ResizeObserver(() => {
+      if (followAnswer.current) el.scrollTop = el.scrollHeight;
+    });
+    resize.observe(el);
+    return () => resize.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    const el = composer.current;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(100, Math.max(40, el.scrollHeight))}px`;
+  }, [question]);
+  useEffect(() => {
+    if (!optionsOpen) return;
+    const dismiss = (e) => {
+      if (!optionsRoot.current?.contains(e.target)) setOptionsOpen(false);
+    };
+    window.addEventListener("pointerdown", dismiss);
+    return () => window.removeEventListener("pointerdown", dismiss);
+  }, [optionsOpen]);
   function commit(next) {
     currentMessages.current = next;
     latest.current.onMessages(next);
@@ -162,6 +202,10 @@ const ReaderAI = forwardRef(function ReaderAI(
     const controller = new AbortController();
     request.current = controller;
     setBusy(true);
+    followAnswer.current = true;
+    setShowLatest(false);
+    setOptionsOpen(false);
+    if (studyTools.current) studyTools.current.open = false;
     setError("");
     setRetry(null);
     setProgress("Preparing your question…");
@@ -302,9 +346,20 @@ const ReaderAI = forwardRef(function ReaderAI(
         </strong>
         <div>
           <button
+            title={expanded ? "Restore AI panel width" : "Expand AI panel"}
+            aria-label={expanded ? "Restore AI panel width" : "Expand AI panel"}
+            onClick={onExpand}
+            className="reader-ai-expand"
+          >
+            {expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+          </button>
+          <button
             title="AI settings"
             aria-label="AI settings"
-            onClick={() => setSettings(!settings)}
+            onClick={() => {
+              setSettings(!settings);
+              setOptionsOpen(true);
+            }}
           >
             <Settings2 size={17} />
           </button>
@@ -317,178 +372,305 @@ const ReaderAI = forwardRef(function ReaderAI(
           </button>
         </div>
       </div>
-      {settings && (
-        <div className="reader-ai-settings">
-          <label>
-            DeepSeek API key
-            <input
-              type="password"
-              autoComplete="off"
-              value={key}
-              placeholder="Use server key, or enter your own"
-              onChange={(e) => setKey(e.target.value)}
-            />
-          </label>
-          <p>
-            This key is used for this session. The server key is used when
-            empty.
-          </p>
-        </div>
-      )}
-      <div className="reader-ai-scope">
-        <div
-          className="reader-answer-modes"
-          role="group"
-          aria-label="Answer sources"
-        >
-          <button
-            aria-pressed={answerMode === "extended"}
-            onClick={() => setAnswerMode("extended")}
-          >
-            PDF + knowledge
-          </button>
-          <button
-            aria-pressed={answerMode === "document"}
-            onClick={() => {
-              setAnswerMode("document");
-              if (scope === "none") setScope("page");
-            }}
-          >
-            PDF only
-          </button>
-        </div>
-        <p className="reader-answer-mode-help">
-          {answerMode === "extended"
-            ? "Ask beyond the page. Broader legal knowledge is labelled separately; it is not a live web search."
-            : "Answers stay within the supplied PDF excerpts, with page citations."}
-        </p>
-        <label>
-          PDF context
-          <select
-            aria-label="AI source"
-            value={scope}
-            onChange={(e) => setScope(e.target.value)}
-          >
-            <option value="page">Current page · {page}</option>
-            <option value="selection" disabled={!attachedSelection}>
-              Selected text
-              {attachedSelection
-                ? ` · ${attachedSelection.groups.length} page(s)`
-                : ""}
-            </option>
-            <option value="document">Find relevant pages in document</option>
-            {answerMode === "extended" && (
-              <option value="none">No PDF context</option>
-            )}
-          </select>
-        </label>
-        <p>
-          {scope === "document"
-            ? "Searches the document for excerpts relevant to your question."
-            : scope === "none"
-              ? "Your question and recent conversation are sent without PDF excerpts."
-              : "This text is sent with your question and recent conversation."}
-        </p>
-      </div>
       <div
-        className="reader-conversation"
-        aria-live="polite"
-        aria-relevant="additions text"
+        ref={optionsRoot}
+        className="reader-ai-controls"
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && optionsOpen) {
+            e.stopPropagation();
+            setOptionsOpen(false);
+          }
+        }}
       >
-        {!messages.length && (
-          <div className="reader-ai-intro">
-            <span className="reader-ai-orb">
-              <Sparkles size={25} />
-            </span>
-            <h2>
-              Keep the source
-              <br />
-              in the conversation.
-            </h2>
-            <p>
-              Unpack a difficult provision, compare arguments, or turn a passage
-              into revision notes.
-            </p>
-            <p>
-              Answers link back to the pages used. Check the source before
-              relying on a legal interpretation.
-            </p>
+        <button
+          className="reader-context-button"
+          aria-label="AI context and answer options"
+          aria-expanded={optionsOpen}
+          onClick={() => {
+            setOptionsOpen(!optionsOpen);
+            if (studyTools.current) studyTools.current.open = false;
+          }}
+        >
+          <span>
+            {scope === "selection"
+              ? "Selected text"
+              : scope === "document"
+                ? "Relevant pages"
+                : scope === "none"
+                  ? "No PDF context"
+                  : `Page ${page}`}{" "}
+            · {answerMode === "document" ? "PDF only" : "PDF + knowledge"}
+          </span>
+          <ChevronDown size={14} />
+        </button>
+        <details
+          className="reader-study-tools"
+          ref={studyTools}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && e.currentTarget.open) {
+              e.stopPropagation();
+              e.currentTarget.open = false;
+            }
+          }}
+          onToggle={(e) => {
+            if (e.currentTarget.open) setOptionsOpen(false);
+          }}
+        >
+          <summary>
+            Study tools <ChevronDown size={14} />
+          </summary>
+          <div>
+            <button
+              disabled={busy || scope === "none" || scope === "document"}
+              onClick={() =>
+                ask(
+                  "Summarize the supplied excerpts, distinguishing rules, exceptions, and cases.",
+                  "summary",
+                )
+              }
+            >
+              Summarize
+            </button>
+            <button
+              disabled={busy || scope === "none" || scope === "document"}
+              onClick={() =>
+                ask(
+                  "Create five question-and-answer revision cards from the supplied excerpts. Include a page citation in every answer.",
+                  "flashcards",
+                )
+              }
+            >
+              Revision cards
+            </button>
+            <button
+              disabled={busy || scope === "none" || scope === "document"}
+              onClick={() =>
+                ask("Explain the supplied passage in plain language.")
+              }
+            >
+              Explain
+            </button>
+            {(scope === "none" || scope === "document") && (
+              <p>Select text or use the current page for these tools.</p>
+            )}
+          </div>
+        </details>
+        {optionsOpen && (
+          <div className="reader-ai-options">
+            <div className="reader-options-heading">
+              <strong>Answer options</strong>
+              <button
+                aria-label="Close AI options"
+                onClick={() => setOptionsOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {settings && (
+              <div className="reader-ai-settings">
+                <label>
+                  DeepSeek API key
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={key}
+                    placeholder="Use server key, or enter your own"
+                    onChange={(e) => setKey(e.target.value)}
+                  />
+                </label>
+                <p>
+                  This key is used for this session. The server key is used when
+                  empty.
+                </p>
+              </div>
+            )}
+            <div className="reader-ai-scope">
+              <div
+                className="reader-answer-modes"
+                role="group"
+                aria-label="Answer sources"
+              >
+                <button
+                  aria-pressed={answerMode === "extended"}
+                  onClick={() => setAnswerMode("extended")}
+                >
+                  PDF + knowledge
+                </button>
+                <button
+                  aria-pressed={answerMode === "document"}
+                  onClick={() => {
+                    setAnswerMode("document");
+                    if (scope === "none") setScope("page");
+                  }}
+                >
+                  PDF only
+                </button>
+              </div>
+              <p className="reader-answer-mode-help">
+                {answerMode === "extended"
+                  ? "Ask beyond the page. Broader legal knowledge is labelled separately; it is not a live web search."
+                  : "Answers stay within the supplied PDF excerpts, with page citations."}
+              </p>
+              <label>
+                PDF context
+                <select
+                  aria-label="AI source"
+                  value={scope}
+                  onChange={(e) => setScope(e.target.value)}
+                >
+                  <option value="page">Current page · {page}</option>
+                  <option value="selection" disabled={!attachedSelection}>
+                    Selected text
+                    {attachedSelection
+                      ? ` · ${attachedSelection.groups.length} page(s)`
+                      : ""}
+                  </option>
+                  <option value="document">
+                    Find relevant pages in document
+                  </option>
+                  {answerMode === "extended" && (
+                    <option value="none">No PDF context</option>
+                  )}
+                </select>
+              </label>
+              <p>
+                {scope === "document"
+                  ? "Searches the document for excerpts relevant to your question."
+                  : scope === "none"
+                    ? "Your question and recent conversation are sent without PDF excerpts."
+                    : "This text is sent with your question and recent conversation."}
+              </p>
+            </div>
+            <button
+              className="reader-options-done"
+              onClick={() => setOptionsOpen(false)}
+            >
+              Done
+            </button>
           </div>
         )}
-        {messages.map((message) => (
-          <article
-            key={message.id}
-            className={`reader-message reader-message--${message.role}`}
-          >
-            <strong>{message.role === "user" ? "You" : "LexAstra"}</strong>
-            {message.role === "assistant" && (
-              <span className="reader-answer-label">
-                {message.answerMode === "extended"
-                  ? message.sources?.length
-                    ? "PDF + general knowledge"
-                    : "General knowledge · no PDF text used"
-                  : "PDF only"}
+      </div>
+      <div className="reader-conversation-area">
+        <div
+          ref={conversation}
+          className="reader-conversation"
+          role="log"
+          aria-label="AI conversation"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            const nearEnd =
+              el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+            followAnswer.current = nearEnd;
+            setShowLatest(!nearEnd);
+          }}
+          aria-live="polite"
+          aria-relevant="additions text"
+        >
+          {!messages.length && (
+            <div className="reader-ai-intro">
+              <span className="reader-ai-orb">
+                <Sparkles size={25} />
               </span>
-            )}
-            {message.content ? (
-              <Answer message={message} onGo={onGo} />
-            ) : (
-              <p>{busy ? "Preparing answer…" : "No answer received."}</p>
-            )}
-            {message.incomplete && (
-              <small className="reader-incomplete">Incomplete answer</small>
-            )}
-            {message.role === "assistant" &&
-              message.content &&
-              !message.incomplete &&
-              !busy && (
-                <button
-                  className="reader-save-answer"
-                  onClick={() => onSaveNote(message)}
-                >
-                  Save answer to notes
-                </button>
+              <h2>
+                Keep the source
+                <br />
+                in the conversation.
+              </h2>
+              <p>
+                Unpack a difficult provision, compare arguments, or turn a
+                passage into revision notes.
+              </p>
+              <p>
+                Answers link back to the pages used. Check the source before
+                relying on a legal interpretation.
+              </p>
+            </div>
+          )}
+          {messages.map((message) => (
+            <article
+              key={message.id}
+              className={`reader-message reader-message--${message.role}`}
+            >
+              <strong>{message.role === "user" ? "You" : "LexAstra"}</strong>
+              {message.role === "assistant" && (
+                <span className="reader-answer-label">
+                  {message.answerMode === "extended"
+                    ? message.sources?.length
+                      ? "PDF + general knowledge"
+                      : "General knowledge · no PDF text used"
+                    : "PDF only"}
+                </span>
               )}
-            {message.sources?.length > 0 && (
-              <details className="reader-sources">
-                <summary>Source excerpts · {message.sources.length}</summary>
-                {message.sources.map((s, i) => (
-                  <div key={i}>
-                    <button onClick={() => onGo(s.page)}>
-                      Go to page {s.page}
-                    </button>
-                    <blockquote>{s.text}</blockquote>
-                  </div>
-                ))}
-              </details>
-            )}
-          </article>
-        ))}
-        <div ref={bottom} />
+              {message.content ? (
+                <Answer message={message} onGo={onGo} />
+              ) : (
+                <p>{busy ? "Preparing answer…" : "No answer received."}</p>
+              )}
+              {message.incomplete && (
+                <small className="reader-incomplete">Incomplete answer</small>
+              )}
+              {message.role === "assistant" &&
+                message.content &&
+                !message.incomplete &&
+                !busy && (
+                  <button
+                    className="reader-save-answer"
+                    onClick={() => onSaveNote(message)}
+                  >
+                    Save answer to notes
+                  </button>
+                )}
+              {message.sources?.length > 0 && (
+                <details className="reader-sources">
+                  <summary>Source excerpts · {message.sources.length}</summary>
+                  {message.sources.map((s, i) => (
+                    <div key={i}>
+                      <button onClick={() => onGo(s.page)}>
+                        Go to page {s.page}
+                      </button>
+                      <blockquote>{s.text}</blockquote>
+                    </div>
+                  ))}
+                </details>
+              )}
+            </article>
+          ))}
+        </div>
+        {showLatest && (
+          <button
+            className="reader-jump-latest"
+            onClick={() => {
+              followAnswer.current = true;
+              setShowLatest(false);
+              conversation.current.scrollTop =
+                conversation.current.scrollHeight;
+            }}
+          >
+            <ArrowDown size={14} /> Latest answer
+          </button>
+        )}
       </div>
       <div className="reader-ai-composer">
         {scope === "selection" && attachedSelection && (
           <div className="reader-ai-attachment">
-            <div>
-              <strong>
+            <details>
+              <summary>
                 Selected text · Page{" "}
-                {attachedSelection.groups.map((g) => g.page).join(", ")}
-              </strong>
-              <button
-                aria-label="Remove selected text from question"
-                onClick={() => {
-                  setAttachedSelection(null);
-                  setScope("page");
-                  onClearSelection?.();
-                }}
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <blockquote>
-              {attachedSelection.text.slice(0, 220)}
-              {attachedSelection.text.length > 220 ? "…" : ""}
-            </blockquote>
+                {attachedSelection.groups.map((g) => g.page).join(", ")}{" "}
+                <ChevronDown size={13} />
+              </summary>
+              <blockquote>{attachedSelection.text}</blockquote>
+            </details>
+            <button
+              aria-label="Remove selected text from question"
+              onClick={() => {
+                setAttachedSelection(null);
+                setScope("page");
+                onClearSelection?.();
+              }}
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
         {error && (
@@ -501,51 +683,12 @@ const ReaderAI = forwardRef(function ReaderAI(
             )}
           </div>
         )}
-        {busy ? (
+        {busy && (
           <div className="reader-ai-progress" role="status">
             <span>{progress}</span>
             <button onClick={() => request.current?.abort()}>
               <Square size={13} />
               Stop
-            </button>
-          </div>
-        ) : scope === "document" || scope === "none" ? (
-          <p className="reader-ai-retrieval-hint">
-            {scope === "none"
-              ? "Ask a legal question, even if it is not covered in this PDF."
-              : "Ask a specific question to find relevant passages."}
-          </p>
-        ) : (
-          <div className="reader-ai-quick">
-            <button
-              onClick={() =>
-                ask(
-                  "Summarize the supplied excerpts, distinguishing rules, exceptions, and cases.",
-                  "summary",
-                )
-              }
-            >
-              Summarize
-            </button>
-            <button
-              onClick={() =>
-                ask(
-                  "Create five question-and-answer revision cards from the supplied excerpts. Include a page citation in every answer.",
-                  "flashcards",
-                )
-              }
-            >
-              Revision cards
-            </button>
-            <button
-              onClick={() =>
-                ask(
-                  "Explain the supplied passage in plain language.",
-                  "document",
-                )
-              }
-            >
-              Explain
             </button>
           </div>
         )}
@@ -557,10 +700,11 @@ const ReaderAI = forwardRef(function ReaderAI(
         >
           <textarea
             ref={composer}
+            rows={1}
             aria-label="Ask about this PDF"
             placeholder={
               scope === "selection"
-                ? "Ask a follow-up about the selected text…"
+                ? "Ask about this selection…"
                 : "Ask a question…"
             }
             value={question}

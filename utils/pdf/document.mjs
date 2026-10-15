@@ -73,6 +73,17 @@ export function normalizeStudy(value = {}, count = Infinity) {
               Number.isInteger(c.page) && c.page > 0 && c.page <= count
                 ? c.page
                 : null,
+            reviewState: ["again", "known"].includes(c.reviewState)
+              ? c.reviewState
+              : "new",
+            reviewCount:
+              Number.isInteger(c.reviewCount) && c.reviewCount >= 0
+                ? Math.min(c.reviewCount, 100000)
+                : 0,
+            reviewedAt:
+              Number.isFinite(c.reviewedAt) && c.reviewedAt > 0
+                ? c.reviewedAt
+                : null,
           }))
       : [],
     page: clampPage(value.page, count),

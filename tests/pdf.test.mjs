@@ -135,3 +135,36 @@ test("revision cards require valid content and supplied page sources", async () 
     parseFlashcards(JSON.stringify([{ ...card, answer: 9 }]), [2]),
   );
 });
+
+test("card review data survives normalization and invalid imported ratings are reset", () => {
+  const card = {
+    id: "one",
+    question: "A rule?",
+    answer: "The answer",
+    page: 1,
+    reviewState: "known",
+    reviewCount: 3,
+    reviewedAt: 1000,
+  };
+  const result = normalizeStudy(
+    {
+      cards: [
+        card,
+        {
+          ...card,
+          id: "two",
+          reviewState: "bogus",
+          reviewCount: -1,
+          reviewedAt: "yesterday",
+        },
+      ],
+    },
+    2,
+  );
+  assert.equal(result.cards[0].reviewState, "known");
+  assert.equal(result.cards[0].reviewCount, 3);
+  assert.equal(result.cards[0].reviewedAt, 1000);
+  assert.equal(result.cards[1].reviewState, "new");
+  assert.equal(result.cards[1].reviewCount, 0);
+  assert.equal(result.cards[1].reviewedAt, null);
+});

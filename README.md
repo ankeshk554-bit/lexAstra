@@ -92,6 +92,21 @@ On touch screens, adjust native selection handles, then tap Highlight.
 Selected-text questions automatically attach the passage and its pages; the
 attachment remains available for follow-ups until removed or replaced.
 
+Fullscreen in the toolbar (F) expands the whole reader, including AI and selection
+controls. Browsers without the Fullscreen API use a full-window focus view;
+Escape or Exit fullscreen restores the normal layout. The AI panel has a wider
+default, a draggable/keyboard-adjustable divider on desktop, and an expand button.
+Source options and study actions live in compact menus, selected-text previews
+expand on demand, and answers do not pull you away from earlier content while
+streaming. Use Latest answer to resume following the response.
+
+Make revision card turns a selected passage into an editable question and answer
+without an AI request. Cards can also be added manually from the Cards tab.
+Review cards hides answers until revealed; Practice again returns a card to the
+queue, while I remembered completes it. Ratings and review counts are saved
+locally and included in document JSON backups. This is self-assessed recall
+practice, not an automatic spaced-repetition schedule or a correctness check.
+
 Use the reader's Export menu for a document-specific JSON backup or Markdown
 notes. JSON backups can be imported into the same original PDF. This is separate
 from the assistant's general workspace backup. The original PDF must be kept or
@@ -109,8 +124,8 @@ the actual source excerpts and link citations to physical PDF page numbers.
 The default PDF + knowledge mode allows broader legal explanations, with outside
 knowledge labelled separately from PDF-supported claims. PDF only restricts
 answers to the supplied excerpts. No PDF context can be selected for general
-questions, including when reading a scanned document. Summaries and revision
-cards always require PDF text. These modes do not provide live web search or
+questions, including when reading a scanned document. AI summaries and generated
+revision cards always require PDF text. These modes do not provide live web search or
 verification of current law.
 Document retrieval is keyword based, not exhaustive legal research. Image-only
 pages need OCR in another tool before search or AI text analysis. This reader

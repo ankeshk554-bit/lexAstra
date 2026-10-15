@@ -66,6 +66,20 @@ async function mockAnswers(page, requests) {
   });
 }
 
+async function aiOptions(page) {
+  const button = page.getByRole("button", {
+    name: "AI context and answer options",
+  });
+  if ((await button.getAttribute("aria-expanded")) !== "true")
+    await button.click();
+}
+async function studyTool(page, name) {
+  const menu = page.locator(".reader-study-tools");
+  if ((await menu.getAttribute("open")) === null)
+    await menu.locator("summary").click();
+  await menu.getByRole("button", { name, exact: true }).click();
+}
+
 test("highlighter waits for drag release, keeps its colour and supports undo and keyboard exit", async ({
   page,
 }) => {
@@ -153,9 +167,9 @@ test("a question beside real selected text sends its passage and retains it for 
   await page
     .getByRole("button", { name: "Remove selected text from question" })
     .click();
-  await expect(page.getByRole("combobox", { name: "AI source" })).toHaveValue(
-    "page",
-  );
+  await expect(
+    page.getByRole("button", { name: "AI context and answer options" }),
+  ).toContainText("Page 4");
 });
 
 test("mobile selection can be adjusted before highlighting and Explain sends it in one tap", async ({
@@ -224,7 +238,9 @@ test("AI can answer beyond scanned pages but PDF-only questions and summaries re
   await expect(page.locator(".reader-answer-label")).toHaveText(
     "General knowledge · no PDF text used",
   );
+  await aiOptions(page);
   await page.getByRole("combobox", { name: "AI source" }).selectOption("none");
+  await aiOptions(page);
   await page.getByRole("button", { name: "PDF only", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "AI source" })).toHaveValue(
     "page",
@@ -238,10 +254,11 @@ test("AI can answer beyond scanned pages but PDF-only questions and summaries re
   await expect(
     page.getByRole("button", { name: "Retry last request" }),
   ).toHaveCount(0);
+  await aiOptions(page);
   await page
     .getByRole("button", { name: "PDF + knowledge", exact: true })
     .click();
-  await page.getByRole("button", { name: "Summarize", exact: true }).click();
+  await studyTool(page, "Summarize");
   await expect(page.locator(".reader-ai-error")).toContainText("OCR is needed");
   expect(requests).toHaveLength(1);
 });
@@ -253,6 +270,7 @@ test("search-marked selections send the text once and PDF-only requests preserve
   await mockAnswers(page, requests);
   await open(page);
   await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await aiOptions(page);
   await page.getByRole("button", { name: "PDF only", exact: true }).click();
   await page.getByRole("button", { name: "Close AI panel" }).click();
   await page.getByRole("button", { name: "Find in document (Ctrl+F)" }).click();
@@ -485,6 +503,7 @@ test("AI uses explicit sources, supports retry without duplicate questions and p
   await expect(page.locator(".reader-ai-error")).toContainText(
     "temporarily unavailable",
   );
+  await aiOptions(page);
   await page.getByRole("button", { name: "PDF only", exact: true }).click();
   await page.getByRole("button", { name: "Retry last request" }).click();
   await expect(page.locator(".reader-message--assistant")).toContainText(
@@ -512,7 +531,7 @@ test("image-only PDFs stay readable and do not send invented AI context", async 
   await open(page, "scanned.pdf");
   await expect(page.locator(".page canvas").first()).toBeVisible();
   await page.getByRole("button", { name: "Ask AI", exact: true }).click();
-  await page.getByRole("button", { name: "Summarize", exact: true }).click();
+  await studyTool(page, "Summarize");
   await expect(page.locator(".reader-ai-error")).toContainText("OCR is needed");
   expect(calls).toBe(0);
 });
@@ -696,9 +715,7 @@ test("AI revision cards are validated, saved, and available for practice", async
   );
   await open(page);
   await page.getByRole("button", { name: "Ask AI", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Revision cards", exact: true })
-    .click();
+  await studyTool(page, "Revision cards");
   await expect(page.locator(".reader-message--assistant")).toContainText(
     "Created 1 revision cards",
   );
@@ -760,4 +777,305 @@ test("AI generation can be stopped and the next document starts with its own con
   await page.getByRole("button", { name: "Ask AI", exact: true }).click();
   await expect(page.locator(".reader-message")).toHaveCount(0);
   await expect(page.locator(".reader-ai-intro")).toBeVisible();
+});
+
+test("AI gives most of the panel to reading and supports keyboard and pointer resizing", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mockAnswers(page, []);
+  await open(page);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(page.locator(".reader-ai-options")).toHaveCount(0);
+  const readingRatio = () =>
+    page.evaluate(
+      () =>
+        document.querySelector(".reader-conversation").clientHeight /
+        document.querySelector(".reader-ai").clientHeight,
+    );
+  expect(await readingRatio()).toBeGreaterThan(0.65);
+  const pane = page.locator(".reader-ai-container"),
+    divider = page.getByRole("separator", { name: "Resize AI panel" });
+  const initial = (await pane.boundingBox()).width;
+  await divider.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect
+    .poll(async () => (await pane.boundingBox()).width)
+    .toBe(initial + 40);
+  await expect(page.locator(".reader-status")).toContainText("Page 1 of");
+  const grip = await divider.boundingBox();
+  await page.mouse.move(grip.x + 4, grip.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 96, grip.y + 80, { steps: 10 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await pane.boundingBox()).width)
+    .toBe(initial + 140);
+  await page
+    .getByRole("button", { name: "Expand AI panel", exact: true })
+    .click();
+  await expect
+    .poll(async () => (await pane.boundingBox()).width)
+    .toBeGreaterThan(initial + 140);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.querySelector(".reader-viewport").clientWidth >= 320,
+      ),
+    )
+    .toBe(true);
+  await page.getByRole("button", { name: "Restore AI panel width" }).click();
+  await page.getByRole("button", { name: "Close AI panel" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await select(page);
+  await page
+    .getByRole("region", { name: "Selected text actions" })
+    .getByRole("button", { name: "Explain", exact: true })
+    .click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  expect(await readingRatio()).toBeGreaterThan(0.65);
+  await expect(
+    page.locator(".reader-ai-attachment details"),
+  ).not.toHaveAttribute("open");
+  await expect(
+    page.getByRole("textbox", { name: "Ask about this PDF" }),
+  ).toBeInViewport();
+});
+
+test("fullscreen keeps the PDF, AI and selection controls available and restores the page", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await open(page);
+  await go(page, 3);
+  await page
+    .getByRole("button", { name: "Fullscreen reading (F)", exact: true })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement?.className))
+    .toBe("reader-app");
+  await expect(
+    page.getByRole("button", { name: "Exit fullscreen (F)" }),
+  ).toBeVisible();
+  await expect(page.locator(".reader-app")).toHaveCSS("height", "720px");
+  await expect(page.locator(".reader-status")).toContainText("Page 3 of");
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Ask about this PDF" }),
+  ).toBeInViewport();
+  await page.getByRole("button", { name: "Close AI panel" }).click();
+  await go(page, 1);
+  await select(page);
+  await page
+    .getByRole("button", { name: "Make revision card", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Create revision card" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => !!document.fullscreenElement))
+    .toBe(true);
+  await page.getByRole("button", { name: "Exit fullscreen (F)" }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.fullscreenElement))
+    .toBe(null);
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("fullscreen denial falls back to a full-window reader and Escape restores the site", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Element.prototype.requestFullscreen = () =>
+      Promise.reject(new DOMException("Unavailable", "NotAllowedError"));
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await page
+    .getByRole("button", { name: "Fullscreen reading (F)", exact: true })
+    .click();
+  await expect(page.locator(".reader-app")).toHaveClass(/reader-focus/);
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeHidden();
+  expect((await page.locator(".reader-app").boundingBox()).y).toBe(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".reader-app")).not.toHaveClass(/reader-focus/);
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
+  await page.locator(".reader-viewport").focus();
+  await page.keyboard.press("f");
+  await expect(page.locator(".reader-app")).toHaveClass(/reader-focus/);
+  await page.getByRole("button", { name: "Back to library" }).click();
+  await expect(page.locator(".reader-app")).not.toHaveClass(/reader-focus/);
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
+});
+
+test("selected text becomes an offline card and recall progress survives reopening", async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.route("**/api/chat", (route) => {
+    requests++;
+    return route.abort();
+  });
+  await open(page);
+  await select(page);
+  await page
+    .getByRole("button", { name: "Make revision card", exact: true })
+    .click();
+  const editor = page.getByRole("dialog", { name: "Create revision card" });
+  await expect(
+    editor.getByRole("textbox", { name: "Answer", exact: true }),
+  ).toHaveValue(/An offer requires/);
+  await editor
+    .getByRole("textbox", { name: "Question", exact: true })
+    .fill("What does acceptance create?");
+  await editor.getByRole("button", { name: "Save card", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await page.getByRole("button", { name: "Add card", exact: true }).click();
+  await editor
+    .getByRole("textbox", { name: "Question", exact: true })
+    .fill("Which page covers this rule?");
+  await editor
+    .getByRole("textbox", { name: "Answer", exact: true })
+    .fill("Page one.");
+  await editor.getByRole("button", { name: "Save card", exact: true }).click();
+  await page.getByRole("button", { name: "Review cards", exact: true }).click();
+  const review = page.getByRole("dialog", { name: "Review revision cards" });
+  await expect(
+    review.getByRole("heading", { name: "What does acceptance create?" }),
+  ).toBeVisible();
+  await expect(review.locator(".reader-review-answer")).toHaveCount(0);
+  await review
+    .getByRole("button", { name: "Reveal answer", exact: true })
+    .click();
+  await expect(review.locator(".reader-review-answer")).toContainText(
+    "An offer requires",
+  );
+  await review
+    .getByRole("button", { name: "Practice again", exact: true })
+    .click();
+  await expect(review.getByRole("heading")).toHaveText(
+    "Which page covers this rule?",
+  );
+  await review
+    .getByRole("button", { name: "Reveal answer", exact: true })
+    .click();
+  await review
+    .getByRole("button", { name: "I remembered", exact: true })
+    .click();
+  await expect(review.getByRole("heading")).toHaveText(
+    "What does acceptance create?",
+  );
+  await review
+    .getByRole("button", { name: "Reveal answer", exact: true })
+    .click();
+  await review
+    .getByRole("button", { name: "I remembered", exact: true })
+    .click();
+  await expect(review.getByRole("heading")).toHaveText("Review complete");
+  await review
+    .getByRole("button", { name: "Done reviewing", exact: true })
+    .click();
+  await expect(page.locator(".reader-card small")).toHaveText([
+    "Recalled",
+    "Recalled",
+  ]);
+  await expect(page.locator(".reader-document-name [role=status]")).toHaveText(
+    "Notes saved on this device",
+  );
+  await open(page);
+  await page.getByRole("button", { name: "Toggle document sidebar" }).click();
+  await page.getByRole("button", { name: "Cards", exact: true }).click();
+  await expect(page.locator(".reader-card small")).toHaveText([
+    "Recalled",
+    "Recalled",
+  ]);
+  expect(requests).toBe(0);
+});
+
+test("reading earlier AI content is not interrupted by later streaming tokens", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const original = window.fetch;
+    window.fetch = (url, init) => {
+      if (url !== "/api/chat") return original(url, init);
+      const stream = new ReadableStream({
+        start(controller) {
+          window.sendAIChunk = (content, done = false) => {
+            controller.enqueue(
+              new TextEncoder().encode(
+                "data: " +
+                  JSON.stringify({ choices: [{ delta: { content } }] }) +
+                  "\n\n",
+              ),
+            );
+            if (done) controller.close();
+          };
+        },
+      });
+      return Promise.resolve(
+        new Response(stream, {
+          headers: { "Content-Type": "text/event-stream" },
+        }),
+      );
+    };
+  });
+  await open(page);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Ask about this PDF" })
+    .fill("Explain in detail");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect
+    .poll(() => page.evaluate(() => typeof window.sendAIChunk))
+    .toBe("function");
+  await page.evaluate(() =>
+    window.sendAIChunk(
+      "A detailed explanation of the rule and its exceptions.\n\n".repeat(70),
+    ),
+  );
+  const conversation = page.getByRole("log", { name: "AI conversation" });
+  await expect
+    .poll(() =>
+      conversation.evaluate((el) => el.scrollHeight > el.clientHeight * 3),
+    )
+    .toBe(true);
+  await conversation.evaluate((el) => {
+    el.scrollTop = 0;
+    el.dispatchEvent(new Event("scroll"));
+  });
+  await expect(
+    page.getByRole("button", { name: "Latest answer", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    window.sendAIChunk("The final example is now complete.", true),
+  );
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "The final example is now complete.",
+  );
+  expect(await conversation.evaluate((el) => el.scrollTop)).toBe(0);
+  await page
+    .getByRole("button", { name: "Latest answer", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      conversation.evaluate(
+        (el) => el.scrollHeight - el.scrollTop - el.clientHeight,
+      ),
+    )
+    .toBeLessThan(50);
 });
