@@ -73,10 +73,10 @@ const ReaderAI = forwardRef(function ReaderAI(
   },
   ref,
 ) {
-  const [scope, setScope] = useState("page"),
+  const [scope, setScope] = useState(selection ? "selection" : "page"),
     [answerMode, setAnswerMode] = useState("extended"),
     [answerDepth, setAnswerDepth] = useState("auto"),
-    [attachedSelection, setAttachedSelection] = useState(null),
+    [attachedSelection, setAttachedSelection] = useState(selection || null),
     [question, setQuestion] = useState(""),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(""),
@@ -153,12 +153,16 @@ const ReaderAI = forwardRef(function ReaderAI(
     }
     return { page: number, text: cache.current.get(number) };
   }
-  async function sourcesFor(prompt, signal, selected, mode, task) {
-    const activeSelection = selected || attachedSelection;
+  async function sourcesFor(prompt, signal, context, mode, task) {
+    const { scope, selection: activeSelection, page: contextPage } = context;
     const needsPDF =
       mode === "document" || ["summary", "flashcards", "note"].includes(task);
-    if (scope === "none" && !selected) return [];
-    if ((selected || scope === "selection") && activeSelection)
+    if (scope === "none") return [];
+    if (scope === "selection" && !activeSelection)
+      throw new Error(
+        "Select a passage, or change PDF context to Current page.",
+      );
+    if (scope === "selection")
       return contextForPages(
         activeSelection.groups.map((g) => ({
           page: g.page,
@@ -166,7 +170,7 @@ const ReaderAI = forwardRef(function ReaderAI(
         })),
       );
     if (scope !== "document")
-      return contextForPages([await pageText(page, signal)]);
+      return contextForPages([await pageText(contextPage, signal)]);
     const pages = [];
     let size = 0;
     for (let number = 1; number <= document.pdf.numPages; number++) {
@@ -216,11 +220,21 @@ const ReaderAI = forwardRef(function ReaderAI(
         ? "document"
         : answerMode);
     const depth = previous?.depth || answerDepth;
+    const context = previous?.context || {
+      scope: selected ? "selection" : scope,
+      page,
+    };
     let assistantId, base;
     try {
       const sources =
         previous?.sources ||
-        (await sourcesFor(prompt, controller.signal, selected, mode, task));
+        (await sourcesFor(
+          prompt,
+          controller.signal,
+          { ...context, selection: selected || attachedSelection },
+          mode,
+          task,
+        ));
       if (
         !sources.length &&
         (mode === "document" ||
@@ -232,10 +246,16 @@ const ReaderAI = forwardRef(function ReaderAI(
       controller.signal.throwIfAborted();
       base = previous?.base || [
         ...currentMessages.current.slice(-30),
-        { id: crypto.randomUUID(), role: "user", content: prompt },
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: prompt,
+          sources,
+          sourceScope: context.scope,
+        },
       ];
       assistantId = crypto.randomUUID();
-      const prepared = { prompt, task, sources, base, mode, depth };
+      const prepared = { prompt, task, sources, base, mode, depth, context };
       setRetry(prepared);
       commit([
         ...base,
@@ -249,7 +269,9 @@ const ReaderAI = forwardRef(function ReaderAI(
       ]);
       setQuestion("");
       setProgress(
-        mode === "document" ? "Writing from the PDF…" : "Writing your answer…",
+        sources.length
+          ? `Writing with ${context.scope === "selection" ? "selected text" : "PDF context"} · Page ${sources.map((s) => s.page).join(", ")}`
+          : "Writing from general knowledge…",
       );
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -261,6 +283,7 @@ const ReaderAI = forwardRef(function ReaderAI(
           messages: base.map(({ role, content }) => ({ role, content })),
           fileName: document.name,
           documentSources: sources,
+          sourceScope: context.scope,
           answerMode: mode,
           answerDepth: depth,
           task: task === "document" ? "document" : task,
@@ -331,6 +354,10 @@ const ReaderAI = forwardRef(function ReaderAI(
     }
   }
   useImperativeHandle(ref, () => ({
+    attachSelection(selected) {
+      setAttachedSelection(selected);
+      setScope("selection");
+    },
     askSelection(prompt, selected) {
       if (request.current) return false;
       setAttachedSelection(selected);
@@ -641,7 +668,11 @@ const ReaderAI = forwardRef(function ReaderAI(
                 )}
               {message.sources?.length > 0 && (
                 <details className="reader-sources">
-                  <summary>Source excerpts · {message.sources.length}</summary>
+                  <summary>
+                    {message.role === "user"
+                      ? `Question context · ${message.sourceScope === "selection" ? "Selected text" : "PDF excerpts"} · Page ${message.sources.map((s) => s.page).join(", ")}`
+                      : `Source excerpts · ${message.sources.length}`}
+                  </summary>
                   {message.sources.map((s, i) => (
                     <div key={i}>
                       <button onClick={() => onGo(s.page)}>
@@ -674,7 +705,7 @@ const ReaderAI = forwardRef(function ReaderAI(
           <div className="reader-ai-attachment">
             <details>
               <summary>
-                Selected text · Page{" "}
+                {busy ? "Next question · " : ""}Selected text · Page{" "}
                 {attachedSelection.groups.map((g) => g.page).join(", ")}{" "}
                 <ChevronDown size={13} />
               </summary>

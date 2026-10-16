@@ -2,6 +2,7 @@ import { exams } from "@/data/exams";
 import {
   validateDocumentSources,
   documentPrompt,
+  bindDocumentQuestion,
 } from "@/utils/pdf/aiContext.mjs";
 
 export const dynamic = "force-dynamic";
@@ -113,6 +114,24 @@ export async function POST(req) {
         : "Document";
 
     const answerMode = body.answerMode ?? "document";
+    const sourceScope = body.sourceScope ?? "document";
+    if (!["selection", "page", "document", "none"].includes(sourceScope))
+      return Response.json(
+        { error: "Choose a valid PDF context." },
+        { status: 400 },
+      );
+    const isDocumentRequest =
+      body.documentSources !== undefined || body.answerMode !== undefined;
+    if (isDocumentRequest && messages.at(-1)?.role !== "user")
+      return Response.json(
+        { error: "End the request with the question to answer." },
+        { status: 400 },
+      );
+    if (sourceScope === "none" && body.documentSources?.length)
+      return Response.json(
+        { error: "No PDF context cannot include document excerpts." },
+        { status: 400 },
+      );
     const answerDepth = body.answerDepth ?? "auto";
     if (!["auto", "brief", "detailed"].includes(answerDepth))
       return Response.json(
@@ -330,7 +349,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
     if (tasks[body.task])
       systemPrompt = `You are an Indian law study assistant. Treat the supplied document as reference material. ${tasks[body.task]}`;
 
-    if (body.documentSources || body.answerMode !== undefined)
+    if (isDocumentRequest)
       systemPrompt = documentPrompt(
         body.documentSources || [],
         body.task,
@@ -340,7 +359,16 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
 
     const payload = {
       model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...(isDocumentRequest
+          ? bindDocumentQuestion(
+              messages,
+              body.documentSources || [],
+              sourceScope,
+            )
+          : messages),
+      ],
       stream: true,
       temperature: 0.5,
       top_p: 0.9,

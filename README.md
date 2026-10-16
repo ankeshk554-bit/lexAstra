@@ -95,6 +95,10 @@ selections to prevent misplaced highlights. Search-result markup is excluded
 from saved highlight geometry.
 Selected-text questions automatically attach the passage and its pages; the
 attachment remains available for follow-ups until removed or replaced.
+Automatic highlighting also updates this attachment. Each sent question keeps
+its own expandable Question context, so a new selection is not confused with
+the excerpts used for an older answer. Selections changed during generation are
+labelled for the next question; they do not alter the answer already in progress.
 
 Fullscreen in the toolbar (F) expands the whole reader, including AI and selection
 controls. Browsers without the Fullscreen API use a full-window focus view;
@@ -140,6 +144,10 @@ answers to the supplied excerpts. No PDF context can be selected for general
 questions, including when reading a scanned document. AI summaries and generated
 revision cards always require PDF text. These modes do not provide live web search or
 verification of current law.
+The current question and its PDF attachment are delivered together in the final
+user turn, after conversation history. Short requests such as "explain" refer
+to that attachment. In PDF + knowledge mode, selecting just a concept, heading,
+or case name is sufficient to request a broader explanation of that topic.
 Answer depth defaults to Automatic: direct answers with reasoning, definitions,
 examples and qualifications as needed. In depth and Brief options are available
 in AI context and answer options. Retry retains the original mode, sources and

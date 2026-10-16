@@ -344,6 +344,9 @@ const ReaderSession = forwardRef(function ReaderSession(
   }
   function addHighlight(color, note = "", selected = selection) {
     if (!selected) return;
+    // Auto-highlight clears the native selection without mounting selection
+    // actions. Keep the AI attachment in step with the passage just marked.
+    ai.current?.attachSelection(selected);
     const notes = [],
       changedNotes = new Map();
     for (const group of selected.groups) {

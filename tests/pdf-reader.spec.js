@@ -1397,3 +1397,142 @@ test("adding a note to an existing highlight preserves both notes without anothe
     "Remember the rule\n\nCompare with counteroffer",
   );
 });
+
+test("automatic highlighting replaces an older AI attachment before a short explain question", async ({
+  page,
+}) => {
+  const requests = [];
+  await mockAnswers(page, requests);
+  await open(page);
+  await page
+    .getByRole("combobox", { name: "Zoom", exact: true })
+    .selectOption("1");
+  await select(page);
+  await page
+    .getByRole("region", { name: "Selected text actions" })
+    .getByRole("button", { name: "Explain", exact: true })
+    .click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  await page.getByRole("button", { name: "Close AI panel" }).click();
+  await go(page, 4);
+  await page
+    .getByRole("button", { name: "Highlight as you select (H)", exact: true })
+    .click();
+  const selected = page
+    .locator('.page[data-page-number="4"] .textLayer span')
+    .filter({ hasText: "Page 4 discusses" })
+    .first();
+  await expect(selected).toBeVisible();
+  const text = await selected.textContent();
+  await selected.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+  await expect(
+    page.locator('.page[data-page-number="4"] .reader-highlight'),
+  ).toHaveCount(1);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(page.locator(".reader-ai-attachment")).toContainText(text);
+  await page
+    .getByRole("textbox", { name: "Ask about this PDF" })
+    .fill("explain");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1].documentSources).toEqual([{ page: 4, text }]);
+  expect(requests[1].sourceScope).toBe("selection");
+  await expect(page.locator(".reader-message--user").last()).toContainText(
+    "Question context",
+  );
+  await expect(
+    page.locator(".reader-message--user").last().locator("blockquote"),
+  ).toHaveText(text);
+});
+
+test("changing selection during an answer only changes the next question's attachment", async ({
+  page,
+}) => {
+  const requests = [];
+  let finishFirst;
+  const pending = new Promise((resolve) => {
+    finishFirst = resolve;
+  });
+  await page.route("**/api/chat", async (route) => {
+    requests.push(route.request().postDataJSON());
+    if (requests.length === 1) await pending;
+    await route.fulfill({
+      contentType: "text/event-stream",
+      body: 'data: {"choices":[{"delta":{"content":"An explanation."}}]}\n\n',
+    });
+  });
+  try {
+    await open(page);
+    await page
+      .getByRole("combobox", { name: "Zoom", exact: true })
+      .selectOption("1");
+    await select(page);
+    await page
+      .getByRole("region", { name: "Selected text actions" })
+      .getByRole("button", { name: "Explain", exact: true })
+      .click();
+    await expect.poll(() => requests.length).toBe(1);
+    const firstSources = requests[0].documentSources;
+    await go(page, 4);
+    const span = page
+      .locator('.page[data-page-number="4"] .textLayer span')
+      .filter({ hasText: "Page 4 discusses" })
+      .first();
+    await expect(span).toBeVisible();
+    const text = await span.textContent();
+    await span.evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selected = window.getSelection();
+      selected.removeAllRanges();
+      selected.addRange(range);
+      el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    });
+    await expect(page.locator(".reader-ai-attachment")).toContainText(
+      "Next question",
+    );
+    await expect(page.locator(".reader-ai-attachment")).toContainText(text);
+    await expect(page.locator(".reader-ai-progress")).toContainText("Page 1");
+    await expect(
+      page.locator(".reader-message--user").first().locator("blockquote"),
+    ).toHaveText(firstSources[0].text);
+    finishFirst();
+    await expect(page.locator(".reader-message--assistant")).toContainText(
+      "An explanation",
+    );
+    await page
+      .getByRole("textbox", { name: "Ask about this PDF" })
+      .fill("explain");
+    await page.getByRole("button", { name: "Send PDF question" }).click();
+    await expect.poll(() => requests.length).toBe(2);
+    expect(requests[1].documentSources).toEqual([{ page: 4, text }]);
+    await expect(
+      page.locator(".reader-message--user").first().locator("blockquote"),
+    ).toHaveText(firstSources[0].text);
+    await expect(
+      page.locator(".reader-message--user").last().locator("blockquote"),
+    ).toHaveText(text);
+    await page.getByRole("button", { name: "Back to library" }).click();
+    await page
+      .locator('input[accept=".pdf"]')
+      .setInputFiles(fixture("study.pdf"));
+    await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+    await expect(
+      page.locator(".reader-message--user").first().locator("blockquote"),
+    ).toHaveText(firstSources[0].text);
+    await expect(
+      page.locator(".reader-message--user").last().locator("blockquote"),
+    ).toHaveText(text);
+  } finally {
+    finishFirst();
+  }
+});
