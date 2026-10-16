@@ -638,6 +638,7 @@ test("source payloads and PDF asset paths are validated on the server", async ({
 }) => {
   const messages = [{ role: "user", content: "Explain this" }];
   for (const body of [
+    { answerMode: "extended", answerDepth: "invalid", documentSources: [] },
     { answerMode: "invalid", documentSources: [] },
     { answerMode: "document", task: "document", documentSources: [] },
     { answerMode: "extended", task: "summary", documentSources: [] },
@@ -1078,4 +1079,321 @@ test("reading earlier AI content is not interrupted by later streaming tokens", 
       ),
     )
     .toBeLessThan(50);
+});
+
+test("PDF + knowledge switches away from a previous refusal and retains the requested depth on retry", async ({
+  page,
+}) => {
+  const requests = [];
+  await page.route("**/api/chat", (route) => {
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    if (requests.length === 2)
+      return route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: '{"error":"Provider unavailable"}',
+      });
+    return route.fulfill({
+      contentType: "text/event-stream",
+      body:
+        "data: " +
+        JSON.stringify({
+          choices: [
+            {
+              delta: {
+                content:
+                  body.answerMode === "document"
+                    ? "This topic is not in the supplied PDF."
+                    : "General legal context: Article 21 protects life and personal liberty.",
+              },
+            },
+          ],
+        }),
+    });
+  });
+  await open(page);
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await aiOptions(page);
+  await page.getByRole("button", { name: "PDF only", exact: true }).click();
+  const composer = page.getByRole("textbox", { name: "Ask about this PDF" });
+  await composer.fill("Explain Article 21 and its exceptions");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "not in the supplied PDF",
+  );
+  await aiOptions(page);
+  await page
+    .getByRole("button", { name: "PDF + knowledge", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Answer depth" })
+    .selectOption("detailed");
+  await composer.fill("Use your knowledge and explain with examples");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect(page.locator(".reader-ai-error")).toContainText(
+    "Provider unavailable",
+  );
+  await aiOptions(page);
+  await page
+    .getByRole("combobox", { name: "Answer depth" })
+    .selectOption("brief");
+  await page.getByRole("button", { name: "Close AI options" }).click();
+  await page.getByRole("button", { name: "Retry last request" }).click();
+  await expect(page.locator(".reader-message--assistant").last()).toContainText(
+    "Article 21",
+  );
+  expect(requests).toHaveLength(3);
+  expect(requests[1].messages).toContainEqual({
+    role: "assistant",
+    content: "This topic is not in the supplied PDF.",
+  });
+  expect(requests[1].answerMode).toBe("extended");
+  expect(requests[1].answerDepth).toBe("detailed");
+  expect(requests[2]).toEqual(requests[1]);
+  // Unrelated document search results must not block a knowledge question.
+  await aiOptions(page);
+  await page
+    .getByRole("combobox", { name: "AI source" })
+    .selectOption("document");
+  await composer.fill("photosynthesis chlorophyll");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect.poll(() => requests.length).toBe(4);
+  expect(requests[3].documentSources).toEqual([]);
+  expect(requests[3].answerMode).toBe("extended");
+});
+
+test("highlights finish outside the viewport and selecting the same passage does not stack duplicate marks", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .getByRole("button", { name: "Highlight as you select (H)", exact: true })
+    .click();
+  await dragText(page);
+  const viewport = await page.locator(".reader-viewport").boundingBox();
+  await page.mouse.move(viewport.x + 40, viewport.y - 10, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator(".reader-highlight").first()).toBeVisible();
+  await page.getByRole("button", { name: "Undo highlight" }).click();
+  await expect(page.locator(".reader-highlight")).toHaveCount(0);
+  await dragText(page);
+  await page.mouse.up();
+  await expect(page.locator(".reader-highlight")).toHaveCount(1);
+  await dragText(page);
+  await page.mouse.up();
+  await expect(page.locator(".reader-notice")).toContainText(
+    "already highlighted",
+  );
+  await expect(page.locator(".reader-highlight")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await select(page, "Chapter 1");
+  await expect(
+    page.getByRole("region", { name: "Selected text actions" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "Selected text actions" }),
+  ).toHaveCount(0);
+  await expect(page.locator(".reader-highlight")).toHaveCount(1);
+});
+
+test("search-split highlights cover each text fragment once and retain exact partial text", async ({
+  page,
+}) => {
+  await open(page);
+  await page
+    .getByRole("combobox", { name: "Zoom", exact: true })
+    .selectOption("1");
+  await page.getByRole("button", { name: "Find in document (Ctrl+F)" }).click();
+  await page
+    .getByRole("searchbox", { name: "Search document" })
+    .fill("acceptance");
+  await expect(page.locator(".reader-find [role=status]")).toHaveText(
+    "1 of 16",
+  );
+  await select(page);
+  const native = await page.evaluate(() => {
+    const range = window.getSelection().getRangeAt(0);
+    const r = range.getBoundingClientRect();
+    return { text: range.toString(), width: r.width };
+  });
+  await page.getByRole("button", { name: "Highlight yellow" }).click();
+  await expect(page.locator(".reader-highlight").first()).toBeVisible();
+  const totalWidth = await page
+    .locator('.page[data-page-number="1"] .reader-highlight')
+    .evaluateAll((els) =>
+      els.reduce((total, el) => total + el.getBoundingClientRect().width, 0),
+    );
+  // Nested search markup used to add a whole-line box on top of its fragments.
+  expect(Math.abs(totalWidth - native.width)).toBeLessThan(3);
+  await page.getByRole("button", { name: "Toggle document sidebar" }).click();
+  await page.getByRole("button", { name: /^Notes/ }).click();
+  await expect(page.locator(".reader-note blockquote")).toHaveText(native.text);
+  await page.getByRole("button", { name: "Close document sidebar" }).click();
+  const partial = await page
+    .locator('.page[data-page-number="1"] .textLayer .highlight')
+    .first()
+    .evaluate((el) => {
+      const node = el.firstChild;
+      const r = document.createRange();
+      r.setStart(node, 2);
+      r.setEnd(node, 6);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      return r.toString();
+    });
+  await page.getByRole("button", { name: "Highlight pink" }).click();
+  await page.getByRole("button", { name: "Toggle document sidebar" }).click();
+  await page.getByRole("button", { name: /^Notes/ }).click();
+  await expect(page.locator(".reader-note blockquote").last()).toHaveText(
+    partial,
+  );
+});
+
+test("reader themes, independent page tones and AI text size persist and work in fullscreen on mobile", async ({
+  page,
+}) => {
+  const requests = [];
+  await mockAnswers(page, requests);
+  await open(page);
+  await page.getByRole("button", { name: "Save PDF", exact: true }).click();
+  await select(page);
+  await page.getByRole("button", { name: "Highlight yellow" }).click();
+  await page.getByRole("button", { name: "Reader appearance" }).click();
+  const dialog = page.getByRole("dialog", {
+    name: "Make yourself comfortable",
+  });
+  await dialog.getByRole("button", { name: /Night/ }).click();
+  await expect(page.locator(".reader-app")).toHaveAttribute(
+    "data-reader-theme",
+    "night",
+  );
+  await expect(page.locator(".canvasWrapper").first()).not.toHaveCSS(
+    "filter",
+    "none",
+  );
+  await expect(page.locator(".reader-highlight-layer").first()).toHaveCSS(
+    "mix-blend-mode",
+    "screen",
+  );
+  await dialog
+    .getByRole("combobox", { name: "PDF page tone" })
+    .selectOption("original");
+  await expect(page.locator(".canvasWrapper").first()).toHaveCSS(
+    "filter",
+    "none",
+  );
+  await expect(page.locator(".reader-highlight-layer").first()).toHaveCSS(
+    "mix-blend-mode",
+    "multiply",
+  );
+  await dialog
+    .getByRole("combobox", { name: "AI answer text size" })
+    .selectOption("18");
+  await dialog.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Ask about this PDF" })
+    .fill("Explain acceptance");
+  await page.getByRole("button", { name: "Send PDF question" }).click();
+  await expect(page.locator(".reader-message--assistant")).toContainText(
+    "helpful explanation",
+  );
+  await expect(page.locator(".reader-message--assistant")).toHaveCSS(
+    "font-size",
+    "18px",
+  );
+  const contrast = await page
+    .locator(".reader-message--assistant p")
+    .first()
+    .evaluate((el) => {
+      const luminance = (colour) => {
+        const rgb = colour
+          .match(/[\d.]+/g)
+          .slice(0, 3)
+          .map(Number)
+          .map((n) => {
+            const s = n / 255;
+            return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+          });
+        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+      };
+      const foreground = luminance(getComputedStyle(el).color);
+      const background = luminance(
+        getComputedStyle(el.closest(".reader-ai-container")).backgroundColor,
+      );
+      return (
+        (Math.max(foreground, background) + 0.05) /
+        (Math.min(foreground, background) + 0.05)
+      );
+    });
+  expect(contrast).toBeGreaterThanOrEqual(4.5);
+  await page.getByRole("button", { name: "Back to library" }).click();
+  await page.reload();
+  await expect(page.locator(".reader-app")).toHaveAttribute(
+    "data-reader-theme",
+    "night",
+  );
+  await page.locator(".reader-book > button").first().click();
+  await expect(page.locator(".reader-highlight").first()).toBeVisible();
+  await expect(page.locator(".canvasWrapper").first()).toHaveCSS(
+    "filter",
+    "none",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Fullscreen reading (F)" }).click();
+  await page.getByRole("button", { name: "Reader appearance" }).click();
+  await expect(dialog).toBeInViewport();
+  await dialog.getByRole("button", { name: /Sepia/ }).click();
+  await expect(page.locator(".reader-app")).toHaveAttribute(
+    "data-page-tone",
+    "warm",
+  );
+  await dialog.getByRole("button", { name: /Sage/ }).click();
+  await expect(page.locator(".reader-app")).toHaveAttribute(
+    "data-reader-theme",
+    "sage",
+  );
+  await dialog.getByRole("button", { name: /Paper/ }).click();
+  await expect(page.locator(".reader-app")).toHaveAttribute(
+    "data-reader-theme",
+    "paper",
+  );
+  await dialog.getByRole("button", { name: "Close reader appearance" }).click();
+  await page.getByRole("button", { name: "Exit fullscreen (F)" }).click();
+});
+
+test("adding a note to an existing highlight preserves both notes without another mark", async ({
+  page,
+}) => {
+  await open(page);
+  for (const note of ["Remember the rule", "Compare with counteroffer"]) {
+    await select(page);
+    await page.locator(".reader-selection-note summary").click();
+    await page.getByRole("textbox", { name: "Note for selection" }).fill(note);
+    await page.getByRole("button", { name: "Highlight yellow" }).click();
+    await expect(page.locator(".reader-highlight")).toHaveCount(1);
+  }
+  await expect(page.locator(".reader-notice")).toContainText(
+    "Note added to the existing highlight",
+  );
+  await page.getByRole("button", { name: "Toggle document sidebar" }).click();
+  await page.getByRole("button", { name: /^Notes/ }).click();
+  await expect(page.locator(".reader-note")).toHaveCount(1);
+  await expect(page.locator(".reader-note textarea")).toHaveValue(
+    "Remember the rule\n\nCompare with counteroffer",
+  );
+  await page.getByRole("button", { name: "Back to library" }).click();
+  await page
+    .locator('input[accept=".pdf"]')
+    .setInputFiles(fixture("study.pdf"));
+  await expect(page.locator(".reader-highlight")).toHaveCount(1);
+  await page.getByRole("button", { name: "Toggle document sidebar" }).click();
+  await page.getByRole("button", { name: /^Notes/ }).click();
+  await expect(page.locator(".reader-note textarea")).toHaveValue(
+    "Remember the rule\n\nCompare with counteroffer",
+  );
 });

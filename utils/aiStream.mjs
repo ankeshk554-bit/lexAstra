@@ -4,7 +4,8 @@ export async function readAIStream(response, onText = () => {}) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "",
-    text = "";
+    text = "",
+    truncated = false;
   const consume = (line) => {
     if (!line.startsWith("data:")) return;
     const payload = line.slice(5).trim();
@@ -14,6 +15,7 @@ export async function readAIStream(response, onText = () => {}) {
       throw new Error(event.error.message || "AI stream failed.");
     const delta = event.choices?.[0]?.delta?.content;
     if (typeof delta === "string") text += delta;
+    if (event.choices?.[0]?.finish_reason === "length") truncated = true;
   };
   try {
     while (true) {
@@ -30,6 +32,10 @@ export async function readAIStream(response, onText = () => {}) {
     }
     if (!text.trim())
       throw new Error("The AI service returned an empty answer. Try again.");
+    if (truncated)
+      throw new Error(
+        "The answer reached the provider's length limit and is incomplete. Ask to continue the explanation, or ask one part at a time.",
+      );
     return text;
   } finally {
     reader.releaseLock();

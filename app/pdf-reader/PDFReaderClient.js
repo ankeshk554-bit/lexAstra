@@ -14,6 +14,10 @@ import { storage } from "@/utils/storage";
 import { loadPDFEngine, documentOptions } from "@/utils/pdf/engine";
 import { normalizeStudy, validatePDFFile } from "@/utils/pdf/document.mjs";
 import ReaderSession from "@/components/pdf/ReaderSession";
+import {
+  APPEARANCE_KEY,
+  loadAppearance,
+} from "@/components/pdf/ReaderAppearance";
 import "./reader.css";
 
 async function migrateNotes(pdf, name) {
@@ -65,6 +69,12 @@ async function migrateNotes(pdf, name) {
   return {};
 }
 export default function PDFReaderClient() {
+  const [appearance, setAppearance] = useState(loadAppearance);
+  const [appearanceSaved, setAppearanceSaved] = useState(true);
+  function changeAppearance(value) {
+    setAppearance(value);
+    setAppearanceSaved(storage.setItem(APPEARANCE_KEY, JSON.stringify(value)));
+  }
   const [engine, setEngine] = useState(null),
     [document, setDocument] = useState(null),
     [books, setBooks] = useState([]);
@@ -247,6 +257,9 @@ export default function PDFReaderClient() {
   return (
     <div
       className="reader-app"
+      data-reader-theme={appearance.theme}
+      data-page-tone={appearance.pageTone}
+      style={{ "--reader-answer-size": `${appearance.answerSize}px` }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) {
           e.preventDefault();
@@ -291,6 +304,9 @@ export default function PDFReaderClient() {
           engine={engine}
           onOpen={() => input.current.click()}
           onClose={close}
+          appearance={appearance}
+          onAppearance={changeAppearance}
+          appearanceSaved={appearanceSaved}
         />
       ) : (
         <div className="reader-library">

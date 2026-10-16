@@ -19,7 +19,8 @@ const PDFViewport = forwardRef(function PDFViewport(
     viewerRef = useRef(null),
     instanceRef = useRef(null),
     selecting = useRef(false),
-    pointerType = useRef("mouse");
+    pointerType = useRef("mouse"),
+    selectedRange = useRef(null);
   const latest = useRef({ annotations, hand, onChange, onSelection, onError });
   useEffect(() => {
     latest.current = { annotations, hand, onChange, onSelection, onError };
@@ -121,12 +122,33 @@ const PDFViewport = forwardRef(function PDFViewport(
     on("pagechanging", ({ pageNumber }) =>
       latest.current.onChange({ page: pageNumber }),
     );
-    on("scalechanging", ({ scale, presetValue }) =>
-      latest.current.onChange({ scale, scaleValue: presetValue || scale }),
-    );
-    on("rotationchanging", ({ pagesRotation }) =>
-      latest.current.onChange({ rotation: pagesRotation }),
-    );
+    const clearSelection = () => {
+      if (selectedRange.current || selecting.current) {
+        selectedRange.current = null;
+        selecting.current = false;
+        window.getSelection()?.removeAllRanges();
+        latest.current.onSelection(null);
+      }
+    };
+    on("scalechanging", ({ scale, presetValue }) => {
+      clearSelection();
+      latest.current.onChange({ scale, scaleValue: presetValue || scale });
+      drawAnnotations();
+    });
+    on("rotationchanging", ({ pagesRotation }) => {
+      clearSelection();
+      latest.current.onChange({ rotation: pagesRotation });
+      drawAnnotations();
+    });
+    on("textlayerrendered", () => {
+      // Search and rerendering can replace the nodes backing a native range.
+      if (
+        selectedRange.current &&
+        (!selectedRange.current.toString().trim() ||
+          !selectedRange.current.startContainer.isConnected)
+      )
+        clearSelection();
+    });
     on("pagerendered", ({ error }) => {
       if (error)
         latest.current.onError(
@@ -154,6 +176,29 @@ const PDFViewport = forwardRef(function PDFViewport(
     viewer.setDocument(document.pdf);
     // Native mobile selection handles emit selectionchange without mouseup.
     let selectionTimer;
+    const release = (event) => {
+      if (selecting.current || containerRef.current?.contains(event.target)) {
+        selecting.current = false;
+        pan.current = null;
+        clearTimeout(selectionTimer);
+        selectText(
+          pointerType.current === "mouse" &&
+            event.button === 0 &&
+            !event.sourceCapabilities?.firesTouchEvents,
+        );
+      }
+    };
+    // A native selection drag can end outside the viewport. Listening only on
+    // the viewport leaves the reader stuck in a drag and misses the highlight.
+    window.addEventListener("mouseup", release, { signal: abort.signal });
+    window.addEventListener(
+      "blur",
+      () => {
+        selecting.current = false;
+        pan.current = null;
+      },
+      { signal: abort.signal },
+    );
     window.document.addEventListener(
       "selectionchange",
       () => {
@@ -240,11 +285,19 @@ const PDFViewport = forwardRef(function PDFViewport(
   function selectText(complete = false) {
     if (latest.current.hand) return;
     const selection = window.getSelection();
-    if (!selection?.rangeCount || !selection.toString().trim()) return;
+    if (!selection?.rangeCount || !selection.toString().trim()) {
+      if (
+        !window.document.activeElement?.closest(".reader-selection, .reader-ai")
+      ) {
+        selectedRange.current = null;
+        latest.current.onSelection(null);
+      }
+      return;
+    }
     const range = selection.getRangeAt(0),
       container = containerRef.current;
     if (
-      !container.contains(range.startContainer) ||
+      !container.contains(range.startContainer) &&
       !container.contains(range.endContainer)
     )
       return;
@@ -257,22 +310,30 @@ const PDFViewport = forwardRef(function PDFViewport(
         rects = [],
         seenRects = new Set(),
         texts = [];
-      page.querySelectorAll(".textLayer span").forEach((span) => {
-        // Search highlights and marked-content wrappers contain the same text nodes.
-        if (
-          span.classList.contains("markedContent") ||
-          span.classList.contains("highlight") ||
-          !range.intersectsNode(span) ||
-          !span.firstChild
-        )
-          return;
+      const textLayer = page.querySelector(".textLayer");
+      if (!textLayer || !range.intersectsNode(textLayer)) return;
+      // Walk text nodes, not span boxes: search inserts nested spans whose
+      // full element rectangles can extend beyond a partial text selection.
+      const walker = window.document.createTreeWalker(
+        textLayer,
+        NodeFilter.SHOW_TEXT,
+      );
+      let node, lastSpan;
+      while ((node = walker.nextNode())) {
+        if (!node.textContent || !range.intersectsNode(node)) continue;
         const part = window.document.createRange();
-        part.selectNodeContents(span);
-        if (span.contains(range.startContainer))
+        part.selectNodeContents(node);
+        if (part.compareBoundaryPoints(Range.START_TO_START, range) < 0)
           part.setStart(range.startContainer, range.startOffset);
-        if (span.contains(range.endContainer))
+        if (part.compareBoundaryPoints(Range.END_TO_END, range) > 0)
           part.setEnd(range.endContainer, range.endOffset);
+        if (!part.toString()) continue;
+        const span =
+          node.parentElement.closest("span[role=presentation]") ||
+          node.parentElement;
+        if (lastSpan && span !== lastSpan) texts.push(" ");
         texts.push(part.toString());
+        lastSpan = span;
         for (const rect of part.getClientRects()) {
           if (rect.width < 1 || rect.height < 1) continue;
           // Nested search spans can report the same rectangle for element and text.
@@ -294,25 +355,30 @@ const PDFViewport = forwardRef(function PDFViewport(
             Math.max(a[1], b[1]),
           ]);
         }
-      });
+      }
       if (rects.length)
         groups.push({
           page: number,
           rects: rects.slice(0, 1000),
-          text: texts.join(" "),
+          text: texts.join("").trim(),
         });
     });
-    if (groups.length)
+    if (groups.length) {
+      selectedRange.current = range.cloneRange();
       latest.current.onSelection(
         {
           range: range.cloneRange(),
           anchor: range.getBoundingClientRect(),
           signature: JSON.stringify(groups.map((g) => [g.page, g.rects])),
-          text: selection.toString().trim().slice(0, 20000),
+          text: groups
+            .map((g) => g.text)
+            .join("\n")
+            .slice(0, 20000),
           groups,
         },
         { complete },
       );
+    }
   }
   const pan = useRef(null);
   return (
@@ -325,17 +391,11 @@ const PDFViewport = forwardRef(function PDFViewport(
       ref={containerRef}
       tabIndex={0}
       aria-label="PDF pages"
-      onMouseUp={(e) => {
-        selecting.current = false;
-        selectText(
-          pointerType.current === "mouse" &&
-            !e.nativeEvent.sourceCapabilities?.firesTouchEvents,
-        );
-      }}
       onKeyUp={() => selectText()}
       onPointerDown={(e) => {
         pointerType.current = e.pointerType;
         selecting.current = e.pointerType === "mouse" && e.button === 0;
+        if (e.button === 0) latest.current.onSelection(null);
         if (hand && e.button === 0) {
           pan.current = {
             x: e.clientX,
@@ -355,7 +415,6 @@ const PDFViewport = forwardRef(function PDFViewport(
         }
       }}
       onPointerUp={() => {
-        selecting.current = false;
         pan.current = null;
       }}
       onPointerCancel={() => {

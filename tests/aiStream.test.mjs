@@ -51,3 +51,23 @@ test("rejects a missing or empty answer", async () => {
     /empty/,
   );
 });
+
+test("marks a provider-truncated explanation as incomplete while preserving its text", async () => {
+  let shown = "";
+  await assert.rejects(
+    () =>
+      readAIStream(
+        response([
+          encode(
+            event("Partial explanation") +
+              '\n\ndata: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]',
+          ),
+        ]),
+        (text) => {
+          shown = text;
+        },
+      ),
+    /length limit.*incomplete/,
+  );
+  assert.equal(shown, "Partial explanation");
+});

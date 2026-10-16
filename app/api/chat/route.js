@@ -5,6 +5,7 @@ import {
 } from "@/utils/pdf/aiContext.mjs";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 180;
 
 // Maps the chat's exam-mode labels (shown in the UI dropdown) to the
 // corresponding entry in data/exams.js, so the AI can be grounded in the
@@ -112,6 +113,12 @@ export async function POST(req) {
         : "Document";
 
     const answerMode = body.answerMode ?? "document";
+    const answerDepth = body.answerDepth ?? "auto";
+    if (!["auto", "brief", "detailed"].includes(answerDepth))
+      return Response.json(
+        { error: "Choose a valid answer depth." },
+        { status: 400 },
+      );
     if (!["document", "extended"].includes(answerMode))
       return Response.json(
         { error: "Choose a valid answer mode." },
@@ -328,6 +335,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
         body.documentSources || [],
         body.task,
         answerMode,
+        answerDepth,
       );
 
     const payload = {
@@ -336,7 +344,8 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
       stream: true,
       temperature: 0.5,
       top_p: 0.9,
-      max_tokens: 4096,
+      max_tokens:
+        body.documentSources !== undefined && !sourceTask ? 8192 : 4096,
     };
 
     const response = await fetch("https://api.deepseek.com/chat/completions", {
@@ -346,7 +355,7 @@ Focus: Banking Reg, RBI, NI Act, SARFAESI, RDDBFI, PMLA, IBC, IT Act.
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.any([req.signal, AbortSignal.timeout(90000)]),
+      signal: AbortSignal.any([req.signal, AbortSignal.timeout(180000)]),
     });
 
     if (!response.ok) {

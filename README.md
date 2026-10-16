@@ -89,6 +89,10 @@ field is under Add a note. For repeated highlights, enable Highlight in the
 toolbar (or press H), then drag and release on each passage. H also highlights
 an existing selection; Escape exits the tool. The latest highlight can be undone.
 On touch screens, adjust native selection handles, then tap Highlight.
+Mouse drags can finish outside the viewport. Repeating the same highlight in the
+same colour does not stack another mark; zoom and rotation clear pending text
+selections to prevent misplaced highlights. Search-result markup is excluded
+from saved highlight geometry.
 Selected-text questions automatically attach the passage and its pages; the
 attachment remains available for follow-ups until removed or replaced.
 
@@ -99,6 +103,13 @@ default, a draggable/keyboard-adjustable divider on desktop, and an expand butto
 Source options and study actions live in compact menus, selected-text previews
 expand on demand, and answers do not pull you away from earlier content while
 streaming. Use Latest answer to resume following the response.
+
+Appearance in the toolbar offers Paper, Sepia, Sage and Night themes for the
+reader, notes and AI panels. PDF page tone can be set independently to Original
+colours, Warm paper or Night paper; use Original colours for colour-sensitive
+images and diagrams. These display filters never change downloaded or printed
+PDFs. AI answer text can be enlarged to 16 or 18 px. Appearance preferences are
+remembered locally across documents and reloads, including fullscreen reading.
 
 Make revision card turns a selected passage into an editable question and answer
 without an AI request. Cards can also be added manually from the Cards tab.
@@ -121,12 +132,19 @@ excerpts retrieved from document text. It sends these excerpts and recent
 conversation messages to the configured provider, not the PDF binary. Excerpts
 are capped at 6,000 characters each and 22,000 characters total. Answers expose
 the actual source excerpts and link citations to physical PDF page numbers.
-The default PDF + knowledge mode allows broader legal explanations, with outside
-knowledge labelled separately from PDF-supported claims. PDF only restricts
+The default PDF + knowledge mode answers questions beyond the document, including
+unrelated study topics, with outside knowledge labelled separately from
+PDF-supported claims. The current mode takes precedence over earlier PDF-only
+refusals in the conversation. PDF only restricts
 answers to the supplied excerpts. No PDF context can be selected for general
 questions, including when reading a scanned document. AI summaries and generated
 revision cards always require PDF text. These modes do not provide live web search or
 verification of current law.
+Answer depth defaults to Automatic: direct answers with reasoning, definitions,
+examples and qualifications as needed. In depth and Brief options are available
+in AI context and answer options. Retry retains the original mode, sources and
+depth. PDF answers have a larger output allowance; provider length-limit endings
+are marked incomplete so a truncated explanation is not presented as finished.
 Document retrieval is keyword based, not exhaustive legal research. Image-only
 pages need OCR in another tool before search or AI text analysis. This reader
 does not provide OCR, signature verification, redaction, or PDF content editing.
@@ -137,3 +155,5 @@ mobile panels, and storage failure. Compact fixtures are checked in; regenerate
 with `python tests/fixtures/generate.py` after installing `reportlab` and `pypdf`.
 AI tests use mocked responses; production credentials and provider output must
 be checked separately.
+Route tests also inspect the actual upstream payload for source modes and
+explanation instructions, using a mocked provider rather than a live API key.

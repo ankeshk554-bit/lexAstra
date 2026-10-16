@@ -40,6 +40,7 @@ import ReaderAI from "./ReaderAI";
 import SelectionActions, { HIGHLIGHT_COLORS } from "./SelectionActions";
 import StudyCards from "./StudyCards";
 import useReaderFullscreen from "./useReaderFullscreen";
+import ReaderAppearance from "./ReaderAppearance";
 
 function Tool({ label, children, ...props }) {
   return (
@@ -122,7 +123,15 @@ function Thumbnail({ pdf, page, active, onGo }) {
   );
 }
 const ReaderSession = forwardRef(function ReaderSession(
-  { document, engine, onOpen, onClose },
+  {
+    document,
+    engine,
+    onOpen,
+    onClose,
+    appearance,
+    onAppearance,
+    appearanceSaved,
+  },
   ref,
 ) {
   const [study, setStudy] = useState(document.study),
@@ -335,24 +344,68 @@ const ReaderSession = forwardRef(function ReaderSession(
   }
   function addHighlight(color, note = "", selected = selection) {
     if (!selected) return;
-    const notes = selected.groups.map((group) => ({
-      id: crypto.randomUUID(),
-      page: group.page,
-      rects: group.rects,
-      color,
-      text: group.text || selected.text,
-      note,
-      createdAt: Date.now(),
+    const notes = [],
+      changedNotes = new Map();
+    for (const group of selected.groups) {
+      const candidate = {
+        id: crypto.randomUUID(),
+        page: group.page,
+        rects: group.rects,
+        color,
+        text: group.text || selected.text,
+        note: note.trim(),
+        createdAt: Date.now(),
+      };
+      const existing = snapshot.current.annotations.find(
+        (existing) =>
+          existing.page === candidate.page &&
+          existing.color === candidate.color &&
+          existing.rects.length === candidate.rects.length &&
+          existing.rects.every((rect, i) =>
+            rect.every(
+              (coordinate, j) =>
+                Math.abs(coordinate - candidate.rects[i][j]) < 0.5,
+            ),
+          ),
+      );
+      if (!existing) notes.push(candidate);
+      else if (
+        candidate.note &&
+        !existing.note.split("\n\n").includes(candidate.note)
+      ) {
+        changedNotes.set(existing.id, {
+          ...existing,
+          note: existing.note
+            ? `${existing.note}\n\n${candidate.note}`
+            : candidate.note,
+        });
+      }
+    }
+    if (!notes.length && !changedNotes.size) {
+      setSelection(null);
+      window.getSelection()?.removeAllRanges();
+      setNotice("This passage is already highlighted in that colour.");
+      return;
+    }
+    update((s) => ({
+      ...s,
+      annotations: [
+        ...s.annotations.map(
+          (existing) => changedNotes.get(existing.id) || existing,
+        ),
+        ...notes,
+      ],
     }));
-    update((s) => ({ ...s, annotations: [...s.annotations, ...notes] }));
     setHighlightColor(color);
     setRecentHighlights(notes.map((n) => n.id));
     setSelection(null);
     window.getSelection()?.removeAllRanges();
     setNotice(
-      highlightMode
-        ? "Highlighted. Select another passage to keep highlighting."
-        : "Highlight saved to your notes.",
+      changedNotes.size && !notes.length
+        ? "Note added to the existing highlight."
+        : highlightMode
+          ? "Highlighted. Select another passage to keep highlighting."
+          : "Highlight saved to your notes.",
     );
   }
   function selectPassage(value, { complete = false } = {}) {
@@ -705,6 +758,11 @@ const ReaderSession = forwardRef(function ReaderSession(
           <Bookmark size={17} fill={bookmark ? "currentColor" : "none"} />
         </Tool>
         <span className="reader-toolbar-spacer" />
+        <ReaderAppearance
+          appearance={appearance}
+          onChange={onAppearance}
+          saved={appearanceSaved}
+        />
         <Tool
           label={
             fullscreen.active ? "Exit fullscreen (F)" : "Fullscreen reading (F)"

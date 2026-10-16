@@ -75,6 +75,7 @@ const ReaderAI = forwardRef(function ReaderAI(
 ) {
   const [scope, setScope] = useState("page"),
     [answerMode, setAnswerMode] = useState("extended"),
+    [answerDepth, setAnswerDepth] = useState("auto"),
     [attachedSelection, setAttachedSelection] = useState(null),
     [question, setQuestion] = useState(""),
     [busy, setBusy] = useState(false),
@@ -214,6 +215,7 @@ const ReaderAI = forwardRef(function ReaderAI(
       (["summary", "flashcards", "note"].includes(task)
         ? "document"
         : answerMode);
+    const depth = previous?.depth || answerDepth;
     let assistantId, base;
     try {
       const sources =
@@ -233,7 +235,7 @@ const ReaderAI = forwardRef(function ReaderAI(
         { id: crypto.randomUUID(), role: "user", content: prompt },
       ];
       assistantId = crypto.randomUUID();
-      const prepared = { prompt, task, sources, base, mode };
+      const prepared = { prompt, task, sources, base, mode, depth };
       setRetry(prepared);
       commit([
         ...base,
@@ -260,6 +262,7 @@ const ReaderAI = forwardRef(function ReaderAI(
           fileName: document.name,
           documentSources: sources,
           answerMode: mode,
+          answerDepth: depth,
           task: task === "document" ? "document" : task,
         }),
         signal: controller.signal,
@@ -508,9 +511,25 @@ const ReaderAI = forwardRef(function ReaderAI(
               </div>
               <p className="reader-answer-mode-help">
                 {answerMode === "extended"
-                  ? "Ask beyond the page. Broader legal knowledge is labelled separately; it is not a live web search."
+                  ? "Ask any study question, even about a different topic. Uses broader knowledge when the PDF does not answer it, labelled separately. No live web search."
                   : "Answers stay within the supplied PDF excerpts, with page citations."}
               </p>
+              <label className="reader-answer-depth">
+                Explanation
+                <select
+                  aria-label="Answer depth"
+                  value={answerDepth}
+                  onChange={(e) => setAnswerDepth(e.target.value)}
+                >
+                  <option value="auto">
+                    Automatic · as much detail as needed
+                  </option>
+                  <option value="detailed">
+                    In depth · reasoning and examples
+                  </option>
+                  <option value="brief">Brief · essential explanation</option>
+                </select>
+              </label>
               <label>
                 PDF context
                 <select
